@@ -17,19 +17,18 @@
       </div>
 
       <template v-else>
-        <div class="task-grid">
-          <!-- 筛选栏 -->
-          <div class="filter-bar">
-          <input v-model="filterText" class="filter-input" placeholder="搜索任务名称…" />
-          <select v-model="filterType" class="filter-select">
-            <option value="">全部类型</option>
-            <option v-for="tt in TASK_TYPES" :key="tt.value" :value="tt.value">{{ tt.label }}</option>
-          </select>
-          <select v-model="filterSort" class="filter-select">
-            <option value="newest">最新创建</option>
-            <option value="oldest">最早创建</option>
-            <option value="name">名称排序</option>
-          </select>
+        <!-- 筛选栏 -->
+        <div class="filter-bar">
+        <input v-model="filterText" class="filter-input" placeholder="搜索任务名称…" />
+        <select v-model="filterType" class="filter-select">
+          <option value="">全部类型</option>
+          <option v-for="tt in TASK_TYPES" :key="tt.value" :value="tt.value">{{ tt.label }}</option>
+        </select>
+        <select v-model="filterSort" class="filter-select">
+          <option value="newest">最新创建</option>
+          <option value="oldest">最早创建</option>
+          <option value="name">名称排序</option>
+        </select>
         </div>
 
         <template v-if="filteredTasks.length > 0">
@@ -111,7 +110,6 @@
         <div v-else class="empty-filter">
           <p>没有匹配的任务，请调整筛选条件</p>
         </div>
-      </div>
       </template>
     </main>
 
@@ -307,13 +305,6 @@ function formatTime(iso: string): string {
   padding: 32px 48px 0;
 }
 
-.task-grid {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -321,6 +312,7 @@ function formatTime(iso: string): string {
   justify-content: center;
   min-height: 60vh;
   gap: 12px;
+  padding: 32px 48px;
 }
 
 .empty-icon {
@@ -360,7 +352,7 @@ function formatTime(iso: string): string {
   gap: 16px;
   align-items: center;
   flex-wrap: wrap;
-  padding: 16px 0 20px;
+  padding: 0 0 20px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -407,7 +399,7 @@ function formatTime(iso: string): string {
   overflow-y: auto;
   flex: 1;
   min-height: 0;
-  padding: 20px 0 16px;
+  padding: 0 0 24px;
 }
 
 .task-card {
@@ -642,7 +634,7 @@ function formatTime(iso: string): string {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 48px;
+  padding: 12px 0;
   background: var(--bg-panel);
   border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
