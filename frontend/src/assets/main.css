@@ -1,0 +1,89 @@
+/* EasyLabel Global Styles */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg-app: #1e1e1e;
+  --bg-panel: #252526;
+  --bg-elevated: #2d2d30;
+  --bg-hover: #37373d;
+  --border-subtle: #3e3e42;
+  --accent: #f97316;
+  --accent-dim: #b45309;
+  --text-primary: #e4e4e7;
+  --text-secondary: #a1a1aa;
+  --text-dim: #71717a;
+  --success: #4ade80;
+  --danger: #f87171;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --radius: 6px;
+  --topbar-height: 48px;
+  --statusbar-height: 28px;
+  /* 略宽于纯图标栏，够放 2～3 个汉字，又比 80px 紧凑 */
+  --leftbar-width: 62px;
+  --rightbar-width: 300px;
+  /* 左侧竖条工具栏（偏深、与画布区分） */
+  --leftbar-bg: #0a0a0a;
+  --leftbar-border: #1f1f1f;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  background: #1e1e1e !important;
+  background-image: none !important;
+  background-color: #1e1e1e !important;
+  color: var(--text-primary);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  background: #1e1e1e !important;
+  background-image: none !important;
+  background-color: #1e1e1e !important;
+  color: var(--text-primary);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+}

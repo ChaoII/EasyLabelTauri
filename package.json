@@ -1,0 +1,12 @@
+{
+  "name": "easy-label",
+  "private": true,
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "tauri": "node ./frontend/node_modules/@tauri-apps/cli/tauri.js"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.1"
+  }
+}

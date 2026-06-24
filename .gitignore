@@ -1,0 +1,37 @@
+# Rust
+target/
+**/*.rs.bk
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Build output
+*.exe
+*.msi
+*.dll
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+
+# Logs
+*.log
+
+# Temp files from development
+_rebuild.py
+_check.py
+_fix_*.py
+reconstruct.py
