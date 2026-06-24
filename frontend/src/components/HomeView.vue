@@ -352,7 +352,7 @@ function formatTime(iso: string): string {
   gap: 16px;
   align-items: center;
   flex-wrap: wrap;
-  padding: 0 0 20px;
+  padding: 16px 0 24px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border-subtle);
 }
