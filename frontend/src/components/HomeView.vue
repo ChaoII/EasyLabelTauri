@@ -2,10 +2,6 @@
   <div class="home">
     <AppHeader>
       <template #center>
-        <div class="stat-chip" v-if="projectStore.tasks.length > 0">
-          <span class="stat-icon">📁</span>
-          <span>{{ projectStore.tasks.length }} 个任务</span>
-        </div>
       </template>
     </AppHeader>
 
@@ -20,23 +16,24 @@
         </NButton>
       </div>
 
-      <div v-else class="task-grid">
-        <div class="overview-bar">
-          <div class="overview-stat">
-            <span class="stat-num">{{ totalImages }}</span>
-            <span class="stat-label">总图片</span>
-          </div>
-          <div class="overview-stat">
-            <span class="stat-num">{{ totalAnnotated }}</span>
-            <span class="stat-label">已标注</span>
-          </div>
-          <div class="overview-stat">
-            <span class="stat-num">{{ overallProgress }}%</span>
-            <span class="stat-label">总进度</span>
-          </div>
+      <template v-else>
+        <div class="task-grid">
+          <!-- 筛选栏 -->
+          <div class="filter-bar">
+          <input v-model="filterText" class="filter-input" placeholder="搜索任务名称…" />
+          <select v-model="filterType" class="filter-select">
+            <option value="">全部类型</option>
+            <option v-for="tt in TASK_TYPES" :key="tt.value" :value="tt.value">{{ tt.label }}</option>
+          </select>
+          <select v-model="filterSort" class="filter-select">
+            <option value="newest">最新创建</option>
+            <option value="oldest">最早创建</option>
+            <option value="name">名称排序</option>
+          </select>
         </div>
 
-        <div class="card-list">
+        <template v-if="filteredTasks.length > 0">
+          <div class="card-list">
           <div v-for="task in pagedTasks" :key="task.id" class="task-card" @click="openTask(task.id)">
             <div class="card-header">
               <div class="card-type-badge" :style="{ background: typeColor(task.task_type) + '22', color: typeColor(task.task_type) }">
@@ -60,17 +57,10 @@
                 <div class="meta-item">
                   <ImageIcon :size="12" />
                   <span>{{ task.stats.total_images }} 张图片</span>
-          </div>
-          <!-- 翻页 -->
-          <div v-if="totalPages > 1" class="pagination">
-            <button class="page-btn" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">‹</button>
-            <button v-for="p in totalPages" :key="p" class="page-btn" :class="{ active: p === currentPage }" @click="goToPage(p)">{{ p }}</button>
-            <button class="page-btn" :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)">›</button>
-          </div>
-        </div>
-            </div>
-
-            <div class="card-progress">
+              </div>
+              </div>
+              </div>
+              <div class="card-progress">
               <div class="progress-header">
                 <span class="progress-label">标注进度</span>
                 <span class="progress-value">{{ task.stats.annotated_images }} / {{ task.stats.total_images }}</span>
@@ -97,7 +87,32 @@
             </div>
           </div>
         </div>
+        <!-- 翻页 -->
+        <div v-if="filteredTasks.length > 0" class="pagination">
+          <div class="page-size">
+            <span>共 {{ filteredTasks.length }} 项</span>
+            <span class="page-sep">|</span>
+            <span>每页</span>
+            <select v-model.number="pageSize" class="page-size-select">
+              <option :value="8">8</option>
+              <option :value="12">12</option>
+              <option :value="16">16</option>
+              <option :value="24">24</option>
+            </select>
+            <span>个</span>
+          </div>
+          <div class="page-nav">
+            <button class="page-btn" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">‹</button>
+            <button v-for="p in totalPages" :key="p" class="page-btn" :class="{ active: p === currentPage }" @click="goToPage(p)">{{ p }}</button>
+            <button class="page-btn" :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)">›</button>
+          </div>
+        </div>
+        </template>
+        <div v-else class="empty-filter">
+          <p>没有匹配的任务，请调整筛选条件</p>
+        </div>
       </div>
+      </template>
     </main>
 
     <button v-if="projectStore.tasks.length > 0" class="fab" @click="showCreateModal = true" title="新建任务">
@@ -144,7 +159,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { NButton, NInput, NDrawer, NDrawerContent, NModal } from "naive-ui";
 import { Plus, Trash2, FolderOpen, ArrowRight } from "lucide-vue-next";
 import { Image as ImageIcon } from "lucide-vue-next";
@@ -215,28 +230,44 @@ function openTask(id: string) {
   projectStore.openTask(id);
 }
 
-const totalImages = computed(() =>
-  projectStore.tasks.reduce((s, t) => s + t.stats.total_images, 0)
-);
-const totalAnnotated = computed(() =>
-  projectStore.tasks.reduce((s, t) => s + t.stats.annotated_images, 0)
-);
-const overallProgress = computed(() =>
-  totalImages.value === 0 ? 0 : Math.round((totalAnnotated.value / totalImages.value) * 100)
-);
+// ==================== 筛选 ====================
+const filterText = ref("");
+const filterType = ref("");
+const filterSort = ref("newest");
+
+const filteredTasks = computed(() => {
+  let list = projectStore.tasks;
+  if (filterText.value) {
+    const q = filterText.value.toLowerCase();
+    list = list.filter(t => t.name.toLowerCase().includes(q));
+  }
+  if (filterType.value) {
+    list = list.filter(t => t.task_type === filterType.value);
+  }
+  if (filterSort.value === "newest") {
+    list = [...list].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } else if (filterSort.value === "oldest") {
+    list = [...list].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  } else if (filterSort.value === "name") {
+    list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  return list;
+});
 
 // ==================== 分页 ====================
-const PAGE_SIZE = 12;
+const pageSize = ref(12);
 const currentPage = ref(1);
-const totalPages = computed(() => Math.max(1, Math.ceil(projectStore.tasks.length / PAGE_SIZE)));
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredTasks.value.length / pageSize.value)));
 const pagedTasks = computed(() => {
-  const start = (currentPage.value - 1) * PAGE_SIZE;
-  return projectStore.tasks.slice(start, start + PAGE_SIZE);
+  const start = (currentPage.value - 1) * pageSize.value;
+  return filteredTasks.value.slice(start, start + pageSize.value);
 });
 
 function goToPage(n: number) {
   currentPage.value = Math.max(1, Math.min(totalPages.value, n));
 }
+
+watch([pageSize, filterText, filterType, filterSort], () => { currentPage.value = 1; });
 
 function progressOf(task: Task): number {
   if (task.stats.total_images === 0) return 0;
@@ -270,8 +301,17 @@ function formatTime(iso: string): string {
 
 .home-content {
   flex: 1;
-  overflow-y: auto;
-  padding: 32px 48px 80px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 32px 48px 0;
+}
+
+.task-grid {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .empty-state {
@@ -300,64 +340,74 @@ function formatTime(iso: string): string {
   margin-bottom: 8px;
 }
 
-.overview-bar {
-  display: flex;
-  gap: 0;
-  margin-bottom: 24px;
-  padding: 0;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  overflow: hidden;
-}
 
-.overview-stat {
+
+
+
+.overview-stat + 
+
+
+
+
+
+
+
+
+
+/* ---- 筛选栏 ---- */
+.filter-bar {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 16px 0 20px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.filter-input {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 20px 16px;
-  position: relative;
-}
-
-.overview-stat + .overview-stat {
-  border-left: 1px solid var(--border-subtle);
-}
-
-.stat-num {
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--accent);
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: var(--text-dim);
-  font-weight: 500;
-}
-
-.stat-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
+  min-width: 160px;
+  max-width: 260px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
   background: var(--bg-elevated);
-  border-radius: 12px;
-  font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
 }
-
-.stat-icon {
-  font-size: 14px;
+.filter-input:focus {
+  border-color: var(--accent);
+}
+.filter-input::placeholder {
+  color: var(--text-dim);
+}
+.filter-select {
+  min-width: 130px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.filter-select:focus {
+  border-color: var(--accent);
 }
 
 .card-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 16px;
+  align-content: start;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding: 20px 0 16px;
 }
 
 .task-card {
@@ -571,13 +621,59 @@ function formatTime(iso: string): string {
   color: var(--text-primary);
 }
 
+/* ---- 空筛选结果 ---- */
+.empty-filter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.empty-filter p {
+  padding: 32px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+
 /* ---- 翻页 ---- */
 .pagination {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 48px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.page-sep {
+  color: var(--border-subtle);
+}
+.page-size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.page-size-select {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+.page-size-select:focus {
+  border-color: var(--accent);
+}
+.page-nav {
+  display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 24px;
 }
 .page-btn {
   min-width: 32px;
