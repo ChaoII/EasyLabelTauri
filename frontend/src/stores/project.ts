@@ -5,6 +5,7 @@ import type {
   Task,
   TaskType,
   TaskStats,
+  ClassificationMode,
 } from "@/utils/taskTypes";
 import type { ClassDefinition, ImageInfo } from "@/utils/types";
 
@@ -56,7 +57,7 @@ export const useProjectStore = defineStore("project", () => {
 
   // ==================== 任务 CRUD ====================
 
-  async function createTask(name: string, taskType: TaskType, imageFolder: string) {
+  async function createTask(name: string, taskType: TaskType, imageFolder: string, classificationMode?: ClassificationMode) {
     const id = genId();
     const cls: ClassDefinition[] = getDefaultClasses(taskType);
 
@@ -72,10 +73,13 @@ export const useProjectStore = defineStore("project", () => {
       console.error("加载图片目录失败:", e);
     }
 
+    const config = taskType === "classification" ? { classification_mode: classificationMode ?? "single" } : undefined;
+
     const task: Task = {
       id,
       name: name.trim(),
       task_type: taskType,
+      config,
       created_at: now(),
       updated_at: now(),
       image_folder: imageFolder,

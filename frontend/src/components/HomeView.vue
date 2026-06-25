@@ -134,6 +134,13 @@
               </div>
             </div>
           </div>
+          <div v-if="formType === 'classification'" class="field">
+            <label class="field-label">标注模式</label>
+            <div class="mode-switch">
+              <button class="mode-btn" :class="{ active: formClassMode === 'single' }" @click="formClassMode = 'single'">单标签</button>
+              <button class="mode-btn" :class="{ active: formClassMode === 'multi' }" @click="formClassMode = 'multi'">多标签</button>
+            </div>
+          </div>
           <div class="field">
             <label class="field-label">图片文件夹</label>
             <NInput v-model:value="formFolder" placeholder="点击选择文件夹..." readonly size="small" @click="pickFolder">
@@ -162,13 +169,13 @@ import { NButton, NInput, NDrawer, NDrawerContent, NModal } from "naive-ui";
 import { Plus, Trash2, FolderOpen, ArrowRight } from "lucide-vue-next";
 import { Image as ImageIcon } from "lucide-vue-next";
 import { useProjectStore } from "@/stores/project";
-import { TASK_TYPE_LABELS, TASK_TYPE_ICONS, type TaskType, type Task } from "@/utils/taskTypes";
+import { TASK_TYPE_LABELS, TASK_TYPE_ICONS, type TaskType, type Task, type ClassificationMode } from "@/utils/taskTypes";
 import AppHeader from "./AppHeader.vue";
 
 const projectStore = useProjectStore();
 
 const TASK_TYPES: { value: TaskType; label: string; desc: string }[] = [
-  { value: "classification", label: "多标签分类", desc: "为图片分配一个或多个标签" },
+  { value: "classification", label: "分类", desc: "为图片分配类别标签（支持单标签/多标签）" },
   { value: "detection", label: "目标检测", desc: "用矩形框标注目标位置" },
   { value: "rotated_detection", label: "旋转框检测", desc: "用旋转矩形框标注倾斜目标" },
   { value: "keypoint", label: "关键点检测", desc: "标注关键点和包围框" },
@@ -191,6 +198,7 @@ function typeColor(tt: TaskType): string {
 const showCreateModal = ref(false);
 const formName = ref("");
 const formType = ref<TaskType>("detection");
+const formClassMode = ref<ClassificationMode>("single");
 const formFolder = ref("");
 
 const canCreate = computed(() => formName.value.trim() && formFolder.value);
@@ -203,9 +211,10 @@ async function pickFolder() {
 
 async function handleCreate() {
   if (!canCreate.value) return;
-  await projectStore.createTask(formName.value.trim(), formType.value, formFolder.value);
+  await projectStore.createTask(formName.value.trim(), formType.value, formFolder.value, formType.value === 'classification' ? formClassMode.value : undefined);
   formName.value = "";
   formFolder.value = "";
+  formClassMode.value = "single";
   showCreateModal.value = false;
 }
 
@@ -302,7 +311,7 @@ function formatTime(iso: string): string {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 32px 48px 0;
+  padding: 16px 48px 0;
 }
 
 .empty-state {
@@ -349,25 +358,26 @@ function formatTime(iso: string): string {
 /* ---- 筛选栏 ---- */
 .filter-bar {
   display: flex;
-  gap: 16px;
   align-items: center;
   flex-wrap: wrap;
-  padding: 16px 0 24px;
+  padding: 14px 0 14px;
+  margin-bottom: 0;
   flex-shrink: 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 .filter-input {
   flex: 1;
-  min-width: 160px;
-  max-width: 260px;
-  padding: 7px 12px;
-  border-radius: 6px;
+  min-width: 200px;
+  max-width: 280px;
+  padding: 9px 14px;
+  border-radius: 8px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-elevated);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
   outline: none;
   transition: border-color 0.15s;
+  margin-right: 20px;
 }
 .filter-input:focus {
   border-color: var(--accent);
@@ -376,16 +386,20 @@ function formatTime(iso: string): string {
   color: var(--text-dim);
 }
 .filter-select {
-  min-width: 130px;
-  padding: 7px 12px;
-  border-radius: 6px;
+  min-width: 140px;
+  padding: 9px 14px;
+  border-radius: 8px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-elevated);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
   outline: none;
   cursor: pointer;
   transition: border-color 0.15s;
+  margin-right: 20px;
+}
+.filter-select:last-child {
+  margin-right: 0;
 }
 .filter-select:focus {
   border-color: var(--accent);
@@ -399,7 +413,9 @@ function formatTime(iso: string): string {
   overflow-y: auto;
   flex: 1;
   min-height: 0;
-  padding: 0 0 24px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+  padding: 0;
 }
 
 .task-card {
@@ -739,6 +755,32 @@ function formatTime(iso: string): string {
 .type-option.active {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.mode-switch {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  overflow: hidden;
+  align-self: flex-start;
+}
+.mode-btn {
+  padding: 6px 20px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.mode-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+.mode-btn:not(.active):hover {
+  background: var(--bg-hover);
 }
 
 .type-icon {

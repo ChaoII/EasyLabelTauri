@@ -48,8 +48,8 @@
         </div>
       </div>
 
-      <!-- 关键点名称（编辑/添加时均可配置） -->
-      <div class="field">
+      <!-- 关键点名称（仅关键点任务显示） -->
+      <div v-if="taskType === 'keypoint'" class="field">
         <label class="field-label">
           关键点名称
           <span class="field-hint">（用于关键点工具，逗号分隔，示例: nose,left_eye,right_eye）</span>
@@ -91,6 +91,11 @@
 import { ref, nextTick, computed } from "vue";
 import { NModal, NInput, NButton } from "naive-ui";
 import type { ClassDefinition } from "@/utils/types";
+import type { TaskType } from "@/utils/taskTypes";
+
+const props = defineProps<{
+  taskType?: TaskType;
+}>();
 
 const PRESET_COLORS = [
   "#FF6B6B", "#FF9F43", "#FFE66D", "#78E08F",

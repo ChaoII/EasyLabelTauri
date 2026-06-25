@@ -6,7 +6,7 @@ import type { ClassDefinition } from "./types";
  * 任务类型枚举
  */
 export type TaskType =
-  | "classification"   // 多标签分类
+  | "classification"   // 分类（含单标签/多标签子模式）
   | "detection"        // 目标检测（普通矩形框）
   | "rotated_detection" // 旋转框检测
   | "keypoint"          // 关键点检测（角点 + 矩形框）
@@ -17,7 +17,7 @@ export type TaskType =
  * 任务类型中文名
  */
 export const TASK_TYPE_LABELS: Record<TaskType, string> = {
-  classification: "多标签分类",
+  classification: "分类",
   detection: "目标检测",
   rotated_detection: "旋转框检测",
   keypoint: "关键点检测",
@@ -39,10 +39,17 @@ export const TASK_TYPE_ICONS: Record<TaskType, string> = {
 
 // ==================== 任务 ====================
 
+export type ClassificationMode = "single" | "multi";
+
+export interface TaskConfig {
+  classification_mode?: ClassificationMode;
+}
+
 export interface Task {
   id: string;
   name: string;
   task_type: TaskType;
+  config?: TaskConfig;
   created_at: string;   // ISO 时间字符串
   updated_at: string;   // ISO 时间字符串
   image_folder: string; // 图片目录路径
@@ -61,6 +68,8 @@ export interface TaskStats {
 export interface AnnotationConfig {
   // 该任务启用的标注类型
   annotation_types: TaskType[];
+  // 分类模式（仅 classification 任务有效）
+  classification_mode?: ClassificationMode;
 }
 
 // ==================== 任务列表 ====================

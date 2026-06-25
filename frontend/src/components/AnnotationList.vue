@@ -16,7 +16,14 @@
       <div class="ann-info">
         <div class="ann-type">{{ typeName(ann.type) }}</div>
         <div class="ann-class" :style="{ color: getClassColor(annClassId(ann)) }">
-          {{ getClassName(annClassId(ann)) }}
+          <template v-if="ann.type === 'Classification' && 'class_ids' in ann && Array.isArray(ann.class_ids)">
+            <span v-for="(cid, ci) in ann.class_ids" :key="ci" class="cls-tag" :style="{ color: getClassColor(cid), background: getClassColor(cid) + '22' }">
+              {{ getClassName(cid) }}
+            </span>
+          </template>
+          <template v-else>
+            {{ getClassName(annClassId(ann)) }}
+          </template>
         </div>
         <div v-if="ann.type === 'Keypoint'" class="ann-kp-info">
           {{ keypointCountInfo(ann) }}
@@ -156,6 +163,18 @@ function keypointCountInfo(ann: Annotation): string {
 
 .ann-class {
   font-size: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cls-tag {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .ann-kp-info {

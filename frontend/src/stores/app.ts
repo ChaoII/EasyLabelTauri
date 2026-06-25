@@ -285,6 +285,37 @@ export const useAppStore = defineStore("app", () => {
     return cls ? (cls as ClassificationAnnotation).class_ids : [];
   }
 
+  function setClassification(classId: number) {
+    const ids = getClassificationIds();
+    let clsAnn: ClassificationAnnotation | undefined =
+      annotations.value.find((a) => a.type === "Classification") as
+        | ClassificationAnnotation
+        | undefined;
+
+    // 如果已选中同一标签，取消选中
+    if (ids.length === 1 && ids[0] === classId) {
+      if (clsAnn) {
+        removeAnnotation(clsAnn.id);
+      }
+    } else {
+      // 替换为选中的标签
+      if (clsAnn) {
+        clsAnn.class_ids = [classId];
+      } else {
+        const newAnn: ClassificationAnnotation = {
+          id: crypto.randomUUID(),
+          type: "Classification",
+          class_ids: [classId],
+        };
+        addAnnotation(newAnn);
+      }
+    }
+
+    if (imagePath.value) {
+      imageAnnotationMap.value[imagePath.value] = true;
+    }
+  }
+
   function toggleClassification(classId: number) {
     const ids = getClassificationIds();
     const idx = ids.indexOf(classId);
@@ -463,11 +494,11 @@ export const useAppStore = defineStore("app", () => {
       // 默认车牌 4 个角: top_left, top_right, bottom_right, bottom_left
       kpNames.value = ["top_left", "top_right", "bottom_right", "bottom_left"];
     }
-    // 不清空 kpCorners：支持完成一个对象后继续画下一个
+    // 切换类别时清除已有角点（避免残留上一类的关键点）
+    kpCorners.value = [];
+    kpBoxPreview.value = null;
     kpPhase.value = "corners";
-    const nextIndex = kpCorners.value.length;
-    const nextName = kpNames.value[nextIndex] || kpNames.value[0] || "";
-    statusMessage.value = `关键点: 点击放置 "${nextName}" (${nextIndex + 1}/${kpNames.value.length})`;
+    statusMessage.value = `关键点: 点击放置 "${kpNames.value[0] || ""}" (1/${kpNames.value.length})`;
   }
 
   /**
@@ -737,6 +768,7 @@ export const useAppStore = defineStore("app", () => {
     updateClass,
     deleteClass,
     getClassificationIds,
+    setClassification,
     toggleClassification,
   };
 });

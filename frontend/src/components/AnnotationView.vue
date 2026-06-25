@@ -120,9 +120,10 @@
                 :selected-class-id="selectedClassId"
                 :annotations="store.annotations"
                 :multi-mode="task?.task_type === 'classification'"
+                :classification-mode="classificationMode"
                 :selected-class-ids="store.getClassificationIds()"
                 @select="(id) => selectedClassId = id"
-                @toggle="(id) => store.toggleClassification(id)"
+                @toggle="(id) => classificationMode === 'single' ? store.setClassification(id) : store.toggleClassification(id)"
                 @edit="(cls) => classModalRef?.openAsEdit(cls)"
               />
             </div>
@@ -177,6 +178,7 @@
 
     <ClassModal
       ref="classModalRef"
+      :task-type="task?.task_type ?? 'detection'"
       @add="(name, color, kpnames) => { store.addClass(name, color, kpnames); syncClassesToProject(); }"
       @update="(id, name, color, kpnames) => { store.updateClass(id, name, color, kpnames); syncClassesToProject(); }"
       @delete="(id) => { store.deleteClass(id); syncClassesToProject(); }"
@@ -213,6 +215,7 @@ const projectStore = useProjectStore();
 const settingsStore = useSettingsStore();
 
 const task = computed(() => projectStore.tasks.find((t) => t.id === props.taskId));
+const classificationMode = computed(() => task.value?.config?.classification_mode ?? "multi");
 const taskImages = ref<ImageInfo[]>([]);
 const currentImageIndex = ref(0);
 // eslint-disable-next-line

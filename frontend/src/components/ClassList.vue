@@ -16,12 +16,13 @@
       <div
         v-if="multiMode"
         class="class-check"
-        :class="{ checked: selectedClassIds.includes(cls.id) }"
+        :class="{ checked: selectedClassIds.includes(cls.id), 'radio-style': classificationMode === 'single' }"
         :style="{ '--cls-color': cls.color }"
       >
-        <svg v-if="selectedClassIds.includes(cls.id)" width="8" height="8" viewBox="0 0 8 8" fill="none">
+        <svg v-if="classificationMode === 'multi' && selectedClassIds.includes(cls.id)" width="8" height="8" viewBox="0 0 8 8" fill="none">
           <path d="M1.5 4L3.2 6L6.5 2" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
+        <div v-if="classificationMode === 'single' && selectedClassIds.includes(cls.id)" class="radio-dot" />
       </div>
       <div class="color-dot" :style="{ background: cls.color }"></div>
       <span class="name">{{ cls.name }}</span>
@@ -33,6 +34,7 @@
 import { computed } from "vue";
 import { NEmpty } from "naive-ui";
 import type { Annotation, ClassDefinition } from "@/utils/types";
+import type { ClassificationMode } from "@/utils/taskTypes";
 
 const props = defineProps<{
   classes: ClassDefinition[];
@@ -40,6 +42,8 @@ const props = defineProps<{
   annotations?: Annotation[];
   /** 多选模式（分类工具激活时） */
   multiMode?: boolean;
+  /** 分类模式：single 或 multi */
+  classificationMode?: ClassificationMode;
   selectedClassIds?: number[];
 }>();
 
@@ -114,12 +118,23 @@ function onClick(id: number) {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background 0.12s, border-color 0.12s, border-radius 0.12s;
+}
+
+.class-check.radio-style {
+  border-radius: 50%;
 }
 
 .class-check.checked {
   background: var(--cls-color, var(--accent));
   border-color: var(--cls-color, var(--accent));
+}
+
+.radio-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
 }
 
 .color-dot {
