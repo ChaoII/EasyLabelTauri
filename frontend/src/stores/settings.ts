@@ -2,10 +2,12 @@ import { defineStore } from "pinia";
 import { ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 
+export type ThemeMode = "dark" | "light" | "system";
+
 export interface AppSettings {
+  theme_mode: ThemeMode;
   accent_color: string;
   annotation_line_width: string;
-  default_annotation_color: string;
   show_labels: boolean;
   status_bar_visible: boolean;
   dense_mode: boolean;
@@ -19,9 +21,9 @@ const ACCENT_PRESETS = [
 
 export const useSettingsStore = defineStore("settings", () => {
   const settings = ref<AppSettings>({
+    theme_mode: "dark",
     accent_color: "#f97316",
     annotation_line_width: "medium",
-    default_annotation_color: "#38bdf8",
     show_labels: true,
     status_bar_visible: true,
     dense_mode: false,
@@ -57,9 +59,9 @@ export const useSettingsStore = defineStore("settings", () => {
 
   function reset() {
     settings.value = {
+      theme_mode: "dark",
       accent_color: "#f97316",
       annotation_line_width: "medium",
-      default_annotation_color: "#38bdf8",
       show_labels: true,
       status_bar_visible: true,
       dense_mode: false,

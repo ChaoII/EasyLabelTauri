@@ -12,8 +12,28 @@
       <div class="section">
         <div class="section-title">外观</div>
 
+        <div class="field-row">
+          <label class="field-label">主题</label>
+          <div class="theme-toggle">
+            <NButtonGroup size="small">
+              <NButton :type="settingsStore.settings.theme_mode === 'light' ? 'primary' : 'default'" @click="settingsStore.settings.theme_mode = 'light'">
+                <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></template>
+                浅色
+              </NButton>
+              <NButton :type="settingsStore.settings.theme_mode === 'dark' ? 'primary' : 'default'" @click="settingsStore.settings.theme_mode = 'dark'">
+                <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></template>
+                深色
+              </NButton>
+              <NButton :type="settingsStore.settings.theme_mode === 'system' ? 'primary' : 'default'" @click="settingsStore.settings.theme_mode = 'system'">
+                <template #icon><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8M12 17v4"/></svg></template>
+                跟随系统
+              </NButton>
+            </NButtonGroup>
+          </div>
+        </div>
+
         <div class="field">
-          <label class="field-label">强调色</label>
+          <label class="field-label">主题色</label>
           <div class="color-row">
             <div
               v-for="c in settingsStore.ACCENT_PRESETS"
@@ -45,17 +65,6 @@
       <!-- 标注 -->
       <div class="section">
         <div class="section-title">标注</div>
-
-        <div class="field">
-          <label class="field-label">默认标注颜色</label>
-          <NInput
-            v-model:value="settingsStore.settings.default_annotation_color"
-            size="small"
-            style="width: 120px; font-family: monospace"
-            placeholder="#38bdf8"
-          />
-          <div class="color-preview-sm" :style="{ background: settingsStore.settings.default_annotation_color }" />
-        </div>
 
         <div class="field-row">
           <label class="field-label">画布上显示标签</label>
@@ -91,7 +100,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { NModal, NInput, NSwitch, NButton } from "naive-ui";
+import { NModal, NSwitch, NButton, NButtonGroup } from "naive-ui";
 import { useSettingsStore } from "@/stores/settings";
 
 const settingsStore = useSettingsStore();
@@ -119,6 +128,7 @@ function handleReset() {
   gap: 16px;
   max-height: 60vh;
   overflow-y: auto;
+  overflow-x: visible;
 }
 
 .section {
@@ -159,6 +169,15 @@ function handleReset() {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  overflow: visible;
+}
+
+.color-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  overflow: visible;
 }
 
 .color-swatch {
@@ -207,12 +226,8 @@ function handleReset() {
   background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
-.color-preview-sm {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  border: 1px solid var(--border-subtle);
-  flex-shrink: 0;
+.theme-toggle {
+  display: flex;
 }
 
 .modal-footer {

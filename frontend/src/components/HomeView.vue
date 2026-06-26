@@ -18,93 +18,95 @@
 
       <template v-else>
         <!-- 筛选栏 -->
-        <div class="filter-bar">
-        <input v-model="filterText" class="filter-input" placeholder="搜索任务名称…" />
-        <select v-model="filterType" class="filter-select">
-          <option value="">全部类型</option>
-          <option v-for="tt in TASK_TYPES" :key="tt.value" :value="tt.value">{{ tt.label }}</option>
-        </select>
-        <select v-model="filterSort" class="filter-select">
-          <option value="newest">最新创建</option>
-          <option value="oldest">最早创建</option>
-          <option value="name">名称排序</option>
-        </select>
+        <div class="filter-bar" style="display:flex;flex-direction:row;align-items:center;gap:16px;">
+        <NInput v-model:value="filterText" placeholder="搜索任务名称…" size="small" clearable style="width:240px;flex-shrink:0" />
+        <NSelect v-model:value="filterType" :options="filterTypeOptions" placeholder="全部类型" size="small" clearable style="width:140px;flex-shrink:0" />
+        <NSelect v-model:value="filterSort" :options="filterSortOptions" size="small" style="width:140px;flex-shrink:0" />
         </div>
 
         <template v-if="filteredTasks.length > 0">
           <div class="card-list">
-          <div v-for="task in pagedTasks" :key="task.id" class="task-card" @click="openTask(task.id)">
-            <div class="card-header">
-              <div class="card-type-badge" :style="{ background: typeColor(task.task_type) + '22', color: typeColor(task.task_type) }">
-                <span class="badge-icon" aria-hidden="true">{{ TASK_TYPE_ICONS[task.task_type] }}</span>
-                <span class="badge-label">{{ TASK_TYPE_LABELS[task.task_type] }}</span>
-              </div>
-              <div class="card-actions" @click.stop>
-                <button class="icon-btn" title="删除任务" @click="confirmDelete(task)">
-                  <Trash2 :size="14" />
-                </button>
+<div v-for="task in pagedTasks" :key="task.id" class="task-card" @click="openTask(task.id)">
+            <!-- 任务名称 + 类型标签 -->
+            <div class="card-top">
+              <h3 class="card-title">{{ task.name }}</h3>
+              <div class="card-badges">
+                <span class="card-type-badge" :style="{ color: typeColor(task.task_type), background: typeColor(task.task_type) + '18' }">
+                  {{ TASK_TYPE_ICONS[task.task_type] }} {{ TASK_TYPE_LABELS[task.task_type] }}
+                </span>
+                <span v-if="task.task_type === 'classification'" class="card-mode-tag" :class="task.config?.classification_mode ?? 'multi'">
+                  {{ task.config?.classification_mode === 'single' ? '单标签' : '多标签' }}
+                </span>
               </div>
             </div>
 
-            <div class="card-body">
-              <h3 class="card-title">{{ task.name }}</h3>
-              <div class="card-meta">
-                <div class="meta-item">
-                  <FolderOpen :size="12" />
-                  <span>{{ shortPath(task.image_folder) }}</span>
-                </div>
-                <div class="meta-item">
-                  <ImageIcon :size="12" />
-                  <span>{{ task.stats.total_images }} 张图片</span>
+            <!-- 中间内容（flex: 1 填充空间，按钮始终贴底） -->
+            <div class="card-content">
+              <div class="card-info">
+              <div class="info-row">
+                <ImageIcon :size="13" class="info-icon" />
+                <span>{{ task.stats.total_images }} 张图片</span>
               </div>
+              <div class="info-row">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <span class="info-path">{{ shortPath(task.image_folder) }}</span>
               </div>
+              <div class="info-row info-time">
+                <span class="time-label">创建</span>
+                <span class="time-val">{{ formatTime(task.created_at) }}</span>
+                <span class="time-sep">·</span>
+                <span class="time-label">编辑</span>
+                <span class="time-val">{{ formatTime(task.updated_at) }}</span>
               </div>
-              <div class="card-progress">
-              <div class="progress-header">
-                <span class="progress-label">标注进度</span>
-                <span class="progress-value">{{ task.stats.annotated_images }} / {{ task.stats.total_images }}</span>
+            </div>
+
+            <!-- 进度条 -->
+            <div class="card-progress">
+              <div class="progress-stats">
+                <span>标注进度</span>
+                <span class="progress-numbers">{{ task.stats.annotated_images }} / {{ task.stats.total_images }} · {{ progressOf(task) }}%</span>
               </div>
               <div class="progress-bar-bg">
                 <div class="progress-bar-fill" :style="{ width: progressOf(task) + '%' }" :class="{ 'card-bar-done': progressOf(task) >= 100 }" />
               </div>
-              <div class="progress-percent">{{ progressOf(task) }}%</div>
+            </div>
             </div>
 
-            <div class="card-footer">
-              <div class="time-info">
-                <span class="time-label">创建</span>
-                <span class="time-val">{{ formatTime(task.created_at) }}</span>
-              </div>
-              <div class="time-info">
-                <span class="time-label">编辑</span>
-                <span class="time-val">{{ formatTime(task.updated_at) }}</span>
-              </div>
-              <button class="open-btn" @click.stop="openTask(task.id)">
-                开始标注
-                <ArrowRight :size="12" />
+            <!-- 底部操作栏 -->
+            <div class="card-footer" @click.stop>
+              <button class="footer-btn" title="编辑" @click="openTask(task.id)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <span>编辑</span>
+              </button>
+              <button class="footer-btn" title="导出" @click="openExport(task)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>导出</span>
+              </button>
+              <button class="footer-btn btn-danger" title="删除" @click="confirmDelete(task)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                <span>删除</span>
               </button>
             </div>
           </div>
         </div>
         <!-- 翻页 -->
         <div v-if="filteredTasks.length > 0" class="pagination">
-          <div class="page-size">
-            <span>共 {{ filteredTasks.length }} 项</span>
-            <span class="page-sep">|</span>
-            <span>每页</span>
-            <select v-model.number="pageSize" class="page-size-select">
-              <option :value="8">8</option>
-              <option :value="12">12</option>
-              <option :value="16">16</option>
-              <option :value="24">24</option>
-            </select>
-            <span>个</span>
-          </div>
-          <div class="page-nav">
-            <button class="page-btn" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">‹</button>
-            <button v-for="p in totalPages" :key="p" class="page-btn" :class="{ active: p === currentPage }" @click="goToPage(p)">{{ p }}</button>
-            <button class="page-btn" :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)">›</button>
-          </div>
+          <NPagination
+            size="small"
+            show-quick-jumper
+            :page="currentPage"
+            :page-count="totalPages"
+            :page-size="pageSize"
+            :page-sizes="[8, 12, 16, 24]"
+            :item-count="filteredTasks.length"
+            show-size-picker
+            @update:page="goToPage"
+            @update:page-size="(s) => { pageSize = s; currentPage = 1; }"
+          >
+            <template #prefix>
+              <span style="font-size:12px;color:var(--text-secondary);margin-right:8px;white-space:nowrap;">共 {{ filteredTasks.length }} 项</span>
+            </template>
+          </NPagination>
         </div>
         </template>
         <div v-else class="empty-filter">
@@ -113,9 +115,9 @@
       </template>
     </main>
 
-    <button v-if="projectStore.tasks.length > 0" class="fab" @click="showCreateModal = true" title="新建任务">
-      <Plus :size="24" />
-    </button>
+    <NButton v-if="projectStore.tasks.length > 0" class="fab" @click="showCreateModal = true" title="新建任务" circle type="primary" size="large">
+      <template #icon><Plus :size="24" /></template>
+    </NButton>
 
     <NDrawer v-model:show="showCreateModal" :width="400" placement="right">
       <NDrawerContent title="新建标注任务" :native-scrollbar="false">
@@ -137,8 +139,10 @@
           <div v-if="formType === 'classification'" class="field">
             <label class="field-label">标注模式</label>
             <div class="mode-switch">
-              <button class="mode-btn" :class="{ active: formClassMode === 'single' }" @click="formClassMode = 'single'">单标签</button>
-              <button class="mode-btn" :class="{ active: formClassMode === 'multi' }" @click="formClassMode = 'multi'">多标签</button>
+              <NButtonGroup size="small">
+                <NButton :type="formClassMode === 'single' ? 'primary' : 'default'" @click="formClassMode = 'single'">单标签</NButton>
+                <NButton :type="formClassMode === 'multi' ? 'primary' : 'default'" @click="formClassMode = 'multi'">多标签</NButton>
+              </NButtonGroup>
             </div>
           </div>
           <div class="field">
@@ -160,19 +164,47 @@
     <NModal v-model:show="showDeleteModal" preset="dialog" title="删除任务" positive-text="删除" negative-text="取消" type="error" @positive-click="handleDelete">
       确定要删除任务「{{ deleteTarget?.name }}」吗？此操作不可恢复。
     </NModal>
+
+    <!-- 导出弹窗 -->
+    <NModal v-model:show="showExportModal" preset="card" title="导出标注" :mask-closable="true" style="width: 420px">
+      <div class="modal-body-export">
+        <div class="field">
+          <label class="field-label">任务</label>
+          <div class="export-task-name">{{ exportTarget?.name }}</div>
+        </div>
+        <div class="field">
+          <label class="field-label">导出格式</label>
+          <NSelect v-model:value="exportFormat" :options="exportFormatOptions" size="small" />
+        </div>
+        <div class="field">
+          <label class="field-label">导出目录</label>
+          <div class="dir-row">
+            <NInput v-model:value="exportDir" readonly size="small" placeholder="选择导出目录..." />
+            <NButton size="small" @click="pickExportDir">选择</NButton>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="drawer-footer">
+          <NButton size="small" @click="showExportModal = false">取消</NButton>
+          <NButton size="small" type="primary" @click="handleExport" :loading="exporting">导出</NButton>
+        </div>
+      </template>
+    </NModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { NButton, NInput, NDrawer, NDrawerContent, NModal } from "naive-ui";
-import { Plus, Trash2, FolderOpen, ArrowRight } from "lucide-vue-next";
+import { NButton, NInput, NSelect, NPagination, NDrawer, NDrawerContent, NModal, NButtonGroup, useMessage } from "naive-ui";
+import { invoke } from "@tauri-apps/api/core";
 import { Image as ImageIcon } from "lucide-vue-next";
 import { useProjectStore } from "@/stores/project";
 import { TASK_TYPE_LABELS, TASK_TYPE_ICONS, type TaskType, type Task, type ClassificationMode } from "@/utils/taskTypes";
 import AppHeader from "./AppHeader.vue";
 
 const projectStore = useProjectStore();
+const message = useMessage();
 
 const TASK_TYPES: { value: TaskType; label: string; desc: string }[] = [
   { value: "classification", label: "分类", desc: "为图片分配类别标签（支持单标签/多标签）" },
@@ -233,14 +265,90 @@ async function handleDelete() {
   deleteTarget.value = null;
 }
 
+// ==================== 导出 ====================
+const EXPORT_FORMATS: Record<string, { value: string; label: string }[]> = {
+  detection: [{ value: "yolo", label: "YOLO (.txt)" }],
+  rotated_detection: [{ value: "yolo_obb", label: "YOLO OBB (.txt)" }],
+  segmentation: [{ value: "yolo", label: "YOLO (.txt)" }, { value: "coco_json", label: "COCO JSON" }],
+  keypoint: [{ value: "coco_json", label: "COCO JSON" }],
+  ocr: [{ value: "paddleocr", label: "PaddleOCR" }],
+  classification: [{ value: "csv", label: "CSV" }, { value: "yolo", label: "YOLO (.txt)" }],
+};
+
+const showExportModal = ref(false);
+const exportTarget = ref<Task | null>(null);
+const exportFormat = ref("");
+const exportDir = ref("");
+const exportFormatOptions = computed(() => EXPORT_FORMATS[exportTarget.value?.task_type ?? ""] ?? []);
+const exporting = ref(false);
+
+function openExport(task: Task) {
+  exportTarget.value = task;
+  const formats = EXPORT_FORMATS[task.task_type];
+  exportFormat.value = formats?.[0]?.value ?? "";
+  exportDir.value = `${task.image_folder}/export_${exportFormat.value}`;
+  showExportModal.value = true;
+}
+
+async function pickExportDir() {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const selected = await open({ directory: true, title: "选择导出目录" });
+  if (selected) exportDir.value = selected;
+}
+
+async function handleExport() {
+  if (!exportTarget.value || !exportFormat.value || !exportDir.value) return;
+  const t = exportTarget.value;
+  if (t.stats.annotated_images < t.stats.total_images) {
+    message.warning(`标注未完成 (${t.stats.annotated_images}/${t.stats.total_images})，无法导出`);
+    return;
+  }
+  exporting.value = true;
+  try {
+    const outputPath = await invoke<string>("export_annotations", {
+      request: {
+        image_folder: t.image_folder,
+        output_dir: exportDir.value,
+        task_type: t.task_type,
+        export_format: exportFormat.value,
+        classes: (t.classes ?? []).map(c => ({ id: c.id, name: c.name })),
+      },
+    });
+    message.success(`导出成功: ${outputPath}`);
+    showExportModal.value = false;
+  } catch (e) {
+    message.error(`导出失败: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    exporting.value = false;
+  }
+}
+
 function openTask(id: string) {
   projectStore.openTask(id);
 }
 
 // ==================== 筛选 ====================
-const filterText = ref("");
-const filterType = ref("");
-const filterSort = ref("newest");
+const filterTypeOptions = [
+  { label: "全部类型", value: "" as string },
+  ...TASK_TYPES.map(tt => ({ label: tt.label, value: tt.value })),
+];
+const filterSortOptions = [
+  { label: "最新创建", value: "newest" },
+  { label: "最早创建", value: "oldest" },
+  { label: "名称排序", value: "name" },
+];
+const filterText = computed({
+  get: () => projectStore.filterText,
+  set: (v: string) => projectStore.filterText = v,
+});
+const filterType = computed({
+  get: () => projectStore.filterType,
+  set: (v: string) => projectStore.filterType = v,
+});
+const filterSort = computed({
+  get: () => projectStore.filterSort,
+  set: (v: string) => projectStore.filterSort = v,
+});
 
 const filteredTasks = computed(() => {
   let list = projectStore.tasks;
@@ -345,245 +453,184 @@ function formatTime(iso: string): string {
 
 
 
-.overview-stat + 
-
-
-
-
-
-
-
-
-
 /* ---- 筛选栏 ---- */
 .filter-bar {
   display: flex;
+  flex-direction: row;
+  gap: 16px;
   align-items: center;
-  flex-wrap: wrap;
-  padding: 14px 0 14px;
+  padding: 0;
   margin-bottom: 0;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--border-subtle);
 }
 .filter-input {
   flex: 1;
-  min-width: 200px;
-  max-width: 280px;
-  padding: 9px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  font-size: 14px;
-  outline: none;
-  transition: border-color 0.15s;
-  margin-right: 20px;
-}
-.filter-input:focus {
-  border-color: var(--accent);
-}
-.filter-input::placeholder {
-  color: var(--text-dim);
+  min-width: 0;
 }
 .filter-select {
-  min-width: 140px;
-  padding: 9px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  font-size: 14px;
-  outline: none;
-  cursor: pointer;
-  transition: border-color 0.15s;
-  margin-right: 20px;
-}
-.filter-select:last-child {
-  margin-right: 0;
-}
-.filter-select:focus {
-  border-color: var(--accent);
+  width: 140px;
+  flex-shrink: 0;
 }
 
 .card-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
   align-content: start;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
-  margin-top: 16px;
-  margin-bottom: 16px;
+  margin: 12px 0;
   padding: 0;
 }
 
 .task-card {
   background: var(--bg-panel);
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 16px;
+  border-radius: 10px;
+  padding: 14px 16px 0;
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
-
 .task-card:hover {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--accent) 15%, transparent);
 }
-
-.card-header {
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.card-badges {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
+  flex-shrink: 0;
 }
-
 .card-type-badge {
   font-size: 11px;
   font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  line-height: 1;
-}
-
-.badge-icon {
-  font-size: 1.2em;
-  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 6px;
+  line-height: 1.3;
+  white-space: nowrap;
   flex-shrink: 0;
 }
-
-.badge-label {
-  line-height: 1;
-}
-
-.card-actions {
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.task-card:hover .card-actions {
-  opacity: 1;
-}
-
-.card-title {
-  font-size: 15px;
+.card-mode-tag {
+  font-size: 10px;
   font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1.3;
+  white-space: nowrap;
 }
-
-.card-meta {
+.card-mode-tag.single {
+  background: #22c55e18;
+  color: #22c55e;
+}
+.card-mode-tag.multi {
+  background: #3b82f618;
+  color: #3b82f6;
+}
+.card-info {
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
-
-.meta-item {
+.info-row {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: 12px;
   color: var(--text-secondary);
 }
-
+.info-time {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.info-time .time-sep {
+  opacity: 0.5;
+}
+.info-time .time-val {
+  font-variant-numeric: tabular-nums;
+}
+.info-icon {
+  flex-shrink: 0;
+  color: var(--text-dim);
+  opacity: 1;
+}
+.info-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .card-progress {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
-
-.progress-header {
+.progress-stats {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.progress-label {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
-
-.progress-value {
-  font-size: 11px;
-  color: var(--text-dim);
+.progress-numbers {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
-
 .progress-bar-bg {
-  height: 8px;
+  height: 5px;
   background: var(--bg-elevated);
-  border-radius: 4px;
+  border-radius: 3px;
   overflow: hidden;
 }
-
 .progress-bar-fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: 3px;
   background: var(--accent);
   transition: width 0.4s ease;
 }
-
 .progress-bar-fill.card-bar-done {
-  background: #22c55e;
+  background: var(--success);
 }
-
-.progress-percent {
-  font-size: 12px;
-  color: var(--text-dim);
-  font-weight: 600;
-  text-align: right;
-}
-
 .card-footer {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-top: 8px;
+  gap: 0;
   border-top: 1px solid var(--border-subtle);
+  margin-top: 0;
 }
-
-.time-info {
+.footer-btn {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 4px;
-}
-
-.time-label {
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
-.time-val {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.open-btn {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
+  justify-content: center;
   gap: 5px;
-  padding: 5px 12px;
-  background: var(--accent);
-  color: #fff;
+  padding: 7px 0;
   border: none;
-  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
   font-size: 12px;
-  font-weight: 500;
   cursor: pointer;
-  transition: background 0.12s, transform 0.1s;
+  transition: background 0.12s, color 0.12s;
 }
-
-.open-btn:hover {
-  filter: brightness(1.15);
-  transform: scale(1.02);
+.footer-btn + .footer-btn {
+  border-left: 1px solid var(--border-subtle);
+}
+.footer-btn:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+.footer-btn.btn-danger:hover {
+  color: var(--danger);
 }
 
 .fab {
@@ -610,25 +657,6 @@ function formatTime(iso: string): string {
   filter: brightness(1.15);
 }
 
-.icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 0.1s, color 0.1s;
-}
-
-.icon-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
 /* ---- 空筛选结果 ---- */
 .empty-filter {
   display: flex;
@@ -648,68 +676,54 @@ function formatTime(iso: string): string {
 /* ---- 翻页 ---- */
 .pagination {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  padding: 12px 0;
+  padding: 4px 12px;
   background: var(--bg-panel);
   border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
-.page-sep {
-  color: var(--border-subtle);
-}
-.page-size {
+
+
+/* ---- 导出弹窗 ---- */
+.modal-body-export {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.page-size-select {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 12px;
-  outline: none;
-  cursor: pointer;
-}
-.page-size-select:focus {
-  border-color: var(--accent);
-}
-.page-nav {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.page-btn {
-  min-width: 32px;
-  height: 32px;
-  border-radius: 4px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
+  flex-direction: column;
+  gap: 12px;
   font-size: 13px;
-  cursor: pointer;
-  transition: background 0.1s, border-color 0.1s, color 0.1s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
-.page-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-  border-color: var(--accent);
+.modal-body-export :deep(.n-alert) {
+  font-size: 12px !important;
+}
+.modal-body-export :deep(.n-alert__title) {
+  font-size: 12px !important;
+  font-weight: 600;
+}
+.modal-body-export :deep(.n-alert__content) {
+  font-size: 12px !important;
+}
+.modal-body-export .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.modal-body-export .field-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.export-task-name {
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text-primary);
 }
-.page-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+.dir-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
-.page-btn:disabled {
-  opacity: 0.3;
-  cursor: default;
+.dir-row .n-input {
+  flex: 1;
 }
 
 .drawer-body {

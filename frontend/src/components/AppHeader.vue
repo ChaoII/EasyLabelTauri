@@ -95,7 +95,6 @@ function openSettings() {
 .app-header {
   height: var(--topbar-height);
   background: var(--bg-panel);
-  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   padding: 0 8px;

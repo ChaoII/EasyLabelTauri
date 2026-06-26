@@ -84,6 +84,7 @@ export interface ClassDefinition {
   color: string;
   keypoint_names?: string[];
   keypoint_count?: number;
+  keypoint_colors?: string[];
 }
 
 // ==================== 工具 ====================

@@ -31,6 +31,11 @@ export const useProjectStore = defineStore("project", () => {
     tasks.value.find((t) => t.id === currentTaskId.value) ?? null
   );
 
+  // 首页筛选状态（存store避免返回时丢失）
+  const filterText = ref("");
+  const filterType = ref("");
+  const filterSort = ref("newest");
+
   // ==================== 持久化 ====================
 
   async function loadProject() {
@@ -171,6 +176,9 @@ export const useProjectStore = defineStore("project", () => {
     tasks,
     currentTaskId,
     currentTask,
+    filterText,
+    filterType,
+    filterSort,
     loadProject,
     saveProject,
     createTask,

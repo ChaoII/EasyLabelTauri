@@ -17,7 +17,7 @@ export type TaskType =
  * 任务类型中文名
  */
 export const TASK_TYPE_LABELS: Record<TaskType, string> = {
-  classification: "分类",
+  classification: "图像分类",
   detection: "目标检测",
   rotated_detection: "旋转框检测",
   keypoint: "关键点检测",

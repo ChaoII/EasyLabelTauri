@@ -98,6 +98,19 @@ export const useAppStore = defineStore("app", () => {
     } catch (e) {
       console.error("保存标注失败:", e);
     }
+    // 同步更新任务统计
+    try {
+      const { useProjectStore } = await import("./project");
+      const projectStore = useProjectStore();
+      if (projectStore.currentTaskId) {
+        const annotated = Object.values(imageAnnotationMap.value).filter(Boolean).length;
+        const task = projectStore.tasks.find(t => t.id === projectStore.currentTaskId);
+        if (task) {
+          task.stats.annotated_images = annotated;
+          projectStore.saveProject();
+        }
+      }
+    } catch {}
   }
 
   // ==================== 内部：加载图片并读取其标注 ====================
@@ -657,7 +670,7 @@ export const useAppStore = defineStore("app", () => {
     return DEFAULT_COLORS[_colorIndex++ % DEFAULT_COLORS.length];
   }
 
-  function addClass(name: string, color?: string, keypointNames?: string[]) {
+  function addClass(name: string, color?: string, keypointNames?: string[], keypointColors?: string[]) {
     if (!name.trim()) return;
     const id = classes.value.length;
     classes.value.push({
@@ -665,16 +678,20 @@ export const useAppStore = defineStore("app", () => {
       name: name.trim(),
       color: color || nextColor(),
       keypoint_names: keypointNames && keypointNames.length > 0 ? keypointNames : undefined,
+      keypoint_colors: keypointColors && keypointColors.length > 0 ? keypointColors : undefined,
     });
   }
 
-  function updateClass(id: number, name: string, color: string, keypointNames?: string[]) {
+  function updateClass(id: number, name: string, color: string, keypointNames?: string[], keypointColors?: string[]) {
     const cls = classes.value.find((c) => c.id === id);
     if (cls) {
       cls.name = name.trim();
       cls.color = color;
       if (keypointNames !== undefined) {
         cls.keypoint_names = keypointNames.length > 0 ? keypointNames : undefined;
+      }
+      if (keypointColors !== undefined) {
+        cls.keypoint_colors = keypointColors.length > 0 ? keypointColors : undefined;
       }
     }
   }

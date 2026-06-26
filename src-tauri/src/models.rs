@@ -130,11 +130,12 @@ pub struct ClassDefinition {
     pub color: String,
     pub keypoint_names: Option<Vec<String>>,
     pub keypoint_count: Option<usize>,
+    pub keypoint_colors: Option<Vec<String>>,
 }
 
 impl ClassDefinition {
     pub fn new(id: usize, name: String, color: String) -> Self {
-        Self { id, name, color, keypoint_names: None, keypoint_count: None }
+        Self { id, name, color, keypoint_names: None, keypoint_count: None, keypoint_colors: None }
     }
 }
 
@@ -257,12 +258,12 @@ pub struct AppStateData {
 /// 应用设置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
-    /// 强调色
+    /// 主题模式: dark / light / system
+    pub theme_mode: String,
+    /// 主题色
     pub accent_color: String,
     /// 标注线宽: thin / medium / thick
     pub annotation_line_width: String,
-    /// 默认标注颜色
-    pub default_annotation_color: String,
     /// 是否显示标签
     pub show_labels: bool,
     /// 是否显示状态栏
@@ -274,9 +275,9 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
+            theme_mode: "dark".to_string(),
             accent_color: "#f97316".to_string(),
             annotation_line_width: "medium".to_string(),
-            default_annotation_color: "#38bdf8".to_string(),
             show_labels: true,
             status_bar_visible: true,
             dense_mode: false,

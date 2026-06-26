@@ -161,7 +161,8 @@
               :x="B.x" :y="B.y" :width="B.w" :height="B.h"
               :stroke="getClassColor(ann.class_id)"
               :stroke-width="ann.id === store.selectedAnnotationId ? 1 : 0.8"
-              fill="none" />
+              fill="transparent"
+              style="pointer-events:all" />
             <template v-for="L in [polyBBoxLabel(ann, B)]" :key="ann.id + '-pblbl'">
               <g class="ann-label">
                 <rect :x="L.x" :y="L.y" :width="L.w" :height="LABEL_TAG_H" :fill="getClassColor(ann.class_id)" />
@@ -244,7 +245,7 @@
               :cx="kp.x * cw"
               :cy="kp.y * ch"
               r="8"
-              :fill="kpColorByIndex(i, store.classes.length)"
+              :fill="kpColorByIndex(i, store.classes.length, (ann as KeypointAnnotation).class_id)"
               :opacity="kp.visibility === 2 ? 1 : 0.5"
               stroke="#ffffff"
               stroke-width="2" />
@@ -270,12 +271,10 @@
             <text
               :x="kp.x * cw + 20"
               :y="kp.y * ch - 8"
-              :fill="kpColorByIndex(i, store.classes.length)"
-              font-size="10"
+              :fill="kpColorByIndex(i, store.classes.length, (ann as KeypointAnnotation).class_id)"
+              font-size="11"
               font-weight="600"
-              dominant-baseline="central">
-              {{ kp.name }}
-            </text>
+              dominant-baseline="central">{{ kp.name }}</text>
             <!-- 可见性符号 -->
             <template v-if="kp.visibility !== 2">
               <text
@@ -421,7 +420,7 @@
               :cx="cp.x * cw"
               :cy="cp.y * ch"
               r="10"
-              :fill="kpColorByIndex(i, store.classes.length)"
+              :fill="kpColorByIndex(i, store.classes.length, props.selectedClassId)"
               :opacity="cp.visibility === 2 ? 1 : 0.6"
               stroke="#ffffff"
               stroke-width="2" />
@@ -445,7 +444,7 @@
             <text
               :x="cp.x * cw + 20"
               :y="cp.y * ch - 10"
-              :fill="kpColorByIndex(i, store.classes.length)"
+              :fill="kpColorByIndex(i, store.classes.length, props.selectedClassId)"
               font-size="11"
               font-weight="600"
               dominant-baseline="central"
@@ -490,13 +489,13 @@
               :cx="cp.x * cw"
               :cy="cp.y * ch"
               r="10"
-              :fill="kpColorByIndex(i, store.classes.length)"
+              :fill="kpColorByIndex(i, store.classes.length, props.selectedClassId)"
               :opacity="cp.visibility === 2 ? 1 : 0.6"
               stroke="#ffffff"
               stroke-width="2" />
             <circle :cx="cp.x * cw + 12" :cy="cp.y * ch - 12" r="8" fill="#ffffff" stroke="#1a1a1a" stroke-width="1" />
             <text :x="cp.x * cw + 12" :y="cp.y * ch - 12" fill="#1a1a1a" font-size="9" font-weight="700" text-anchor="middle" dominant-baseline="central">{{ i + 1 }}</text>
-            <text :x="cp.x * cw + 22" :y="cp.y * ch - 12" :fill="kpColorByIndex(i, store.classes.length)" font-size="11" font-weight="600" dominant-baseline="central">{{ cp.name }}</text>
+            <text :x="cp.x * cw + 22" :y="cp.y * ch - 12" :fill="kpColorByIndex(i, store.classes.length, props.selectedClassId)" font-size="11" font-weight="600" dominant-baseline="central">{{ cp.name }}</text>
           </g>
           <!-- 矩形框预览（跟随鼠标拖拽实时更新） -->
           <template v-if="store.kpBoxPreview">
@@ -617,17 +616,18 @@
     <div v-if="ocrTextInputVisible" class="ocr-text-overlay" @click.self="ocrTextInputVisible = false">
       <div class="ocr-text-modal">
         <div class="ocr-text-title">输入 OCR 文本</div>
-        <input
-          v-model="ocrTextInput"
-          class="ocr-text-input"
+        <NInput
+          ref="ocrInputRef"
+          v-model:value="ocrTextInput"
           placeholder="请输入识别到的文本内容..."
+          size="small"
+          :maxlength="200"
           @keydown.enter="confirmOcrText"
           @keydown.escape="ocrTextInputVisible = false"
-          autofocus
         />
         <div class="ocr-text-actions">
-          <button class="ocr-btn ocr-btn-cancel" @click="ocrTextInputVisible = false">取消</button>
-          <button class="ocr-btn ocr-btn-confirm" @click="confirmOcrText">确认</button>
+          <NButton size="small" quaternary @click="ocrTextInputVisible = false">取消</NButton>
+          <NButton size="small" type="primary" @click="confirmOcrText">确认</NButton>
         </div>
       </div>
     </div>
@@ -651,12 +651,13 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
+import { reactive, ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from "vue";
 
 const min = Math.min, max = Math.max;
 
 import { useAppStore } from "@/stores/app";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { NInput, NButton } from "naive-ui";
 import type { Annotation, AxisAlignedBox, ClassificationAnnotation, Point, PolygonAnnotation, RotatedBox, KeypointAnnotation, OcrAnnotation } from "@/utils/types";
 
 const props = defineProps<{
@@ -786,6 +787,8 @@ function removeBoxPreview() {
 // OCR 文本输入弹窗是否可见
 const ocrTextInputVisible = ref(false);
 const ocrTextInput = ref("");
+const ocrInputRef = ref<InstanceType<typeof NInput> | null>(null);
+watch(ocrTextInputVisible, (v) => { if (v) nextTick(() => ocrInputRef.value?.focus()); });
 const ocrFirstScreen = ref<{ x: number; y: number } | null>(null);
 
 const ocrModeText = computed(() => {
@@ -2322,8 +2325,13 @@ function fitBoundingBox(keypoints: any[], bb: any): { cx: number; cy: number; wi
   return { cx, cy, width: Math.max(0.001, w), height: Math.max(0.001, h), angle: bb.angle };
 }
 
-/** 根据关键点序号（索引）返回渐变色，最多支持 17 个点（对应人体17个关键点） */
-function kpColorByIndex(index: number, _classCount: number): string {
+/** 关键点颜色：优先使用 per-keypoint 自定义颜色，否则按序号回退渐变色 */
+function kpColorByIndex(index: number, _classCount: number, classId?: number): string {
+  if (classId !== undefined) {
+    const cls = store.classes[classId];
+    const colors = cls?.keypoint_colors;
+    if (colors && colors.length > index) return colors[index];
+  }
   const KP_COLORS = [
     "#FF6B6B", // 1  红
     "#FF9F43", // 2  橙

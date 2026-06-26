@@ -35,9 +35,9 @@ html, body {
   height: 100%;
   overflow: hidden;
   font-family: var(--font-ui);
-  background: #1e1e1e !important;
+  background: var(--bg-app) !important;
   background-image: none !important;
-  background-color: #1e1e1e !important;
+  background-color: var(--bg-app) !important;
   color: var(--text-primary);
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
@@ -49,9 +49,9 @@ html, body {
   height: 100%;
   overflow: hidden;
   font-family: var(--font-ui);
-  background: #1e1e1e !important;
+  background: var(--bg-app) !important;
   background-image: none !important;
-  background-color: #1e1e1e !important;
+  background-color: var(--bg-app) !important;
   color: var(--text-primary);
   font-size: 13px;
   -webkit-font-smoothing: antialiased;

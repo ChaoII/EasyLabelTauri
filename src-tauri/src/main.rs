@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use easy_label_lib::commands::{*, create_keypoint, create_ocr, create_keypoint_with_bbox, load_project_list, save_project_list, load_settings, save_settings};
+use easy_label_lib::commands::{*, create_keypoint, create_ocr, create_keypoint_with_bbox, load_project_list, save_project_list, load_settings, save_settings, export_annotations};
 use tauri::Manager;
 
 fn main() {
@@ -41,6 +41,7 @@ fn main() {
             save_annotations_for_image,
             load_settings,
             save_settings,
+            export_annotations,
         ])
         .run(tauri::generate_context!())
         .expect("启动失败");

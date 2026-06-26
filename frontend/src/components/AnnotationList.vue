@@ -7,6 +7,8 @@
       class="ann-item"
       :class="{ active: ann.id === selectedId }"
       @click="emit('select', ann.id)"
+      @dblclick="emit('edit', ann.id)"
+      :data-ann-id="ann.id"
     >
       <div class="ann-icon" aria-hidden="true">
         <Square v-if="ann.type === 'AxisAlignedBox'" :size="14" class="ann-icon-svg" />
@@ -45,6 +47,7 @@
 </template>
 
 <script setup lang="ts">
+import { watch, nextTick } from "vue";
 import { NButton, NEmpty } from "naive-ui";
 import { Diamond, Square, X } from "lucide-vue-next";
 import type { Annotation, ClassDefinition, KeypointAnnotation } from "@/utils/types";
@@ -57,8 +60,17 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: "select", id: string): void;
+  (e: "edit", id: string): void;
   (e: "delete", id: string): void;
 }>();
+
+watch(() => props.selectedId, (id) => {
+  if (!id) return;
+  nextTick(() => {
+    const el = document.querySelector(`[data-ann-id="${id}"]`);
+    el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
+});
 
 function typeIcon(type: Annotation["type"]): string {
   const map: Record<string, string> = {

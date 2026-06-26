@@ -5,9 +5,9 @@
       <template #center>
         <!-- 返回 + 任务信息 -->
         <div class="ann-title">
-          <button class="back-btn" @click="emit('back')" title="返回任务列表">
-            <ChevronLeft :size="16" />
-          </button>
+          <NButton class="back-btn" @click="emit('back')" title="返回任务列表" quaternary circle size="tiny">
+            <template #icon><ChevronLeft :size="16" /></template>
+          </NButton>
           <div class="task-type-badge" :style="{ background: typeColor + '22', color: typeColor }">
             {{ TASK_TYPE_ICONS[task?.task_type ?? 'detection'] }}
           </div>
@@ -52,7 +52,6 @@
           </ToolButton>
 
           <template v-if="task?.task_type === 'classification'">
-            <div class="tool-sep" />
             <ToolButton
               v-for="tool in clsTools"
               :key="tool.name"
@@ -82,9 +81,9 @@
             <div class="section-title-row">
               <span class="section-title">图片列表</span>
               <span v-if="taskImages.length > 0" class="count-chip">{{ taskImages.length }}</span>
-              <button class="icon-btn" title="重新加载目录" @click="reloadFolder">
-                <RefreshCw :size="13" />
-              </button>
+              <NButton quaternary circle size="tiny" title="重新加载目录" @click="reloadFolder">
+                <template #icon><RefreshCw :size="13" /></template>
+              </NButton>
             </div>
             <div class="image-list" ref="imageListRef" @scroll="onImageListScroll" v-if="taskImages.length > 0">
               <div
@@ -110,9 +109,9 @@
           <div class="panel-section">
             <div class="section-title-row">
               <span class="section-title">标签类别</span>
-              <button class="icon-btn" title="添加类别" @click="classModalRef?.openAsAdd()">
-                <Plus :size="13" />
-              </button>
+              <NButton quaternary circle size="tiny" title="添加类别" @click="classModalRef?.openAsAdd()">
+                <template #icon><Plus :size="13" /></template>
+              </NButton>
             </div>
             <div class="section-scroll">
               <ClassList
@@ -143,6 +142,7 @@
                 :selected-id="store.selectedAnnotationId"
                 :classes="task?.classes ?? []"
                 @select="(id) => store.selectAnnotation(id)"
+                @edit="openAnnEdit"
                 @delete="(id) => store.removeAnnotation(id)"
               />
             </div>
@@ -156,39 +156,76 @@
     <footer class="ann-statusbar" v-show="settingsStore.settings.status_bar_visible">
       <span class="status-text">{{ store.statusMessage }}</span>
       <span class="hint">{{ toolHint }}</span>
+      <span class="shortcut-hint">{{ shortcutHint }}</span>
       <span class="coords">X: {{ store.cursorX }}  Y: {{ store.cursorY }}</span>
 
       <template v-if="taskImages.length > 1">
         <div class="nav-sep" />
-        <button class="nav-btn" @click="goToPrevImage()" :disabled="currentImageIndex <= 0" title="上一张">
-          <ChevronLeft :size="14" />
-        </button>
+        <NButton quaternary circle size="tiny" @click="goToPrevImage()" :disabled="currentImageIndex <= 0" title="上一张">
+          <template #icon><ChevronLeft :size="14" /></template>
+        </NButton>
         <span class="nav-counter">{{ currentImageIndex + 1 }} / {{ taskImages.length }}</span>
-        <button class="nav-btn" @click="goToNextImage()" :disabled="currentImageIndex >= taskImages.length - 1" title="下一张">
-          <ChevronRight :size="14" />
-        </button>
+        <NButton quaternary circle size="tiny" @click="goToNextImage()" :disabled="currentImageIndex >= taskImages.length - 1" title="下一张">
+          <template #icon><ChevronRight :size="14" /></template>
+        </NButton>
       </template>
 
       <div class="nav-sep" />
 
-      <button class="save-btn" @click="saveCurrentAnnotations()" :disabled="!store.imageLoaded">
+      <NButton size="tiny" type="primary" @click="saveCurrentAnnotations()" :disabled="!store.imageLoaded">
         保存
-      </button>
+      </NButton>
     </footer>
 
     <ClassModal
       ref="classModalRef"
       :task-type="task?.task_type ?? 'detection'"
-      @add="(name, color, kpnames) => { store.addClass(name, color, kpnames); syncClassesToProject(); }"
-      @update="(id, name, color, kpnames) => { store.updateClass(id, name, color, kpnames); syncClassesToProject(); }"
+      @add="(name, color, kpnames, kpcolors) => { store.addClass(name, color, kpnames, kpcolors); syncClassesToProject(); }"
+      @update="(id, name, color, kpnames, kpcolors) => { store.updateClass(id, name, color, kpnames, kpcolors); syncClassesToProject(); }"
       @delete="(id) => { store.deleteClass(id); syncClassesToProject(); }"
     />
+
+    <!-- 标注编辑弹窗 -->
+    <NModal
+      v-model:show="annEditVisible"
+      preset="card"
+      title="编辑标注"
+      :mask-closable="true"
+      style="width: 340px"
+    >
+      <div class="modal-body-edit">
+        <div class="field">
+          <label class="field-label">类别</label>
+          <NSelect
+            v-model:value="annEditClassId"
+            :options="classOptions"
+            size="small"
+            placeholder="选择类别"
+          />
+        </div>
+        <div v-if="annEditType === 'Ocr'" class="field">
+          <label class="field-label">文本内容</label>
+          <NInput
+            v-model:value="annEditText"
+            size="small"
+            placeholder="OCR 文本"
+            :maxlength="200"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <div class="modal-footer">
+          <NButton size="small" @click="annEditVisible = false">取消</NButton>
+          <NButton size="small" type="primary" @click="confirmAnnEdit">确认</NButton>
+        </div>
+      </template>
+    </NModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
-import { NBadge } from "naive-ui";
+import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
+import { NBadge, NModal, NSelect, NInput, NButton } from "naive-ui";
 import {
   MousePointer2, Square, Pentagon, CircleDot, Type,
   Hand, ZoomIn, ChevronLeft, ChevronRight, RefreshCw,
@@ -256,10 +293,76 @@ const taskTools = computed(() => taskToolMap[task.value?.task_type ?? "detection
 
 const typeColor = computed(() => {
   const m: Record<TaskType, string> = {
-    classification: "#f97316", detection: "#38bdf8", rotated_detection: "#a855f7",
-    keypoint: "#fbbf24", segmentation: "#4ade80", ocr: "#eab308",
+    classification: "#6366f1", detection: "#3b82f6", rotated_detection: "#8b5cf6",
+    keypoint: "#eab308", segmentation: "#22c55e", ocr: "#06b6d4",
   };
   return m[task.value?.task_type ?? "detection"] ?? "#6b7280";
+});
+
+// ==================== 快捷键 ====================
+const toolKeyMap: Record<string, ToolName> = {
+  "1": "select", "s": "select",
+  "2": "box", "b": "box",
+  "3": "rotated_box", "r": "rotated_box",
+  "4": "polygon", "p": "polygon",
+  "5": "keypoint", "k": "keypoint",
+  "6": "ocr", "o": "ocr",
+  "7": "classification", "c": "classification",
+  "h": "pan",
+  "z": "zoom",
+};
+
+function onKeyDown(e: KeyboardEvent) {
+  // 忽略输入框中的按键
+  const tag = (e.target as HTMLElement)?.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+  const key = e.key.toLowerCase();
+
+  // Ctrl+S 保存
+  if (e.ctrlKey && key === "s") {
+    e.preventDefault();
+    saveCurrentAnnotations();
+    return;
+  }
+
+  // Delete / Backspace 删除选中标注
+  if (key === "delete" || key === "backspace") {
+    if (store.selectedAnnotationId) {
+      store.removeAnnotation(store.selectedAnnotationId);
+    }
+    return;
+  }
+
+  // 左右箭头 切换图片
+  if (key === "arrowleft" || key === "a") {
+    if (store.hasPrevImage) goToPrevImage();
+    return;
+  }
+  if (key === "arrowright" || key === "d") {
+    if (store.hasNextImage) goToNextImage();
+    return;
+  }
+
+  // 工具切换
+  const tool = toolKeyMap[key];
+  if (tool) {
+    // 检查当前任务是否支持该工具
+    const allTaskTools = [...baseTools, ...taskTools.value, ...(task.value?.task_type === "classification" ? clsTools : [])];
+    if (allTaskTools.some(t => t.name === tool)) {
+      activeTool.value = tool;
+    }
+    return;
+  }
+}
+
+const shortcutHint = computed(() => {
+  const tt = task.value?.task_type ?? "detection";
+  const tools = [...baseTools, ...(taskToolMap[tt] ?? []), ...(tt === "classification" ? clsTools : [])];
+  return tools.map(t => {
+    const k = Object.entries(toolKeyMap).find(([_, v]) => v === t.name)?.[0];
+    return k ? `${t.label}[${k.toUpperCase()}]` : t.label;
+  }).join("  ") + "  ←[←/A]  →[→/D]  删除[Del]  保存[Ctrl+S]";
 });
 
 // ==================== 工具提示 ====================
@@ -284,6 +387,11 @@ onMounted(async () => {
   if (taskImages.value.length > 0) {
     await loadImageFromPath(taskImages.value[0].path);
   }
+  document.addEventListener("keydown", onKeyDown);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("keydown", onKeyDown);
 });
 
 // ==================== 图片 ====================
@@ -417,6 +525,43 @@ async function syncClassesToProject() {
   if (props.taskId) {
     await projectStore.updateTaskClasses(props.taskId, store.classes);
   }
+}
+
+// ==================== 标注编辑 ====================
+const annEditVisible = ref(false);
+const annEditId = ref<string | null>(null);
+const annEditType = ref<string>("");
+const annEditClassId = ref<number | null>(null);
+const annEditText = ref("");
+
+const classOptions = computed(() =>
+  (task.value?.classes ?? []).map(c => ({ label: c.name, value: c.id }))
+);
+
+function openAnnEdit(id: string) {
+  const ann = store.annotations.find(a => a.id === id);
+  if (!ann) return;
+  annEditId.value = id;
+  annEditType.value = ann.type;
+  annEditClassId.value = "class_id" in ann ? ann.class_id : null;
+  annEditText.value = ann.type === "Ocr" ? (ann as any).text ?? "" : "";
+  annEditVisible.value = true;
+}
+
+function confirmAnnEdit() {
+  const id = annEditId.value;
+  if (!id) return;
+  const ann = store.annotations.find(a => a.id === id);
+  if (!ann) return;
+  // 更新类别
+  if (annEditClassId.value !== null && "class_id" in ann) {
+    store.updateAnnotation(id, { class_id: annEditClassId.value } as any);
+  }
+  // 更新OCR文本
+  if (ann.type === "Ocr" && annEditText.value !== (ann as any).text) {
+    store.updateAnnotation(id, { text: annEditText.value } as any);
+  }
+  annEditVisible.value = false;
 }
 
 // ==================== 统计 ====================
@@ -725,6 +870,14 @@ const progressPct = computed(() =>
   color: var(--text-dim);
 }
 
+.shortcut-hint {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-right: 12px;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
 .coords {
   font-size: 11px;
   color: var(--text-dim);
@@ -816,5 +969,27 @@ const progressPct = computed(() =>
 .icon-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+/* 标注编辑弹窗 */
+.modal-body-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.modal-body-edit .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.modal-body-edit .field-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.modal-body-edit .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 </style>
