@@ -1266,4 +1266,66 @@ const progressPct = computed(() =>
   font-size: 11px;
   color: var(--text-secondary);
 }
+
+/* ---- AI 标注按钮（与 ToolButton 样式统一） ---- */
+.tool-row {
+  justify-content: center !important;
+  height: auto !important;
+  min-height: 36px;
+  padding: 5px 3px !important;
+  border-radius: 6px !important;
+  border: 1px solid transparent !important;
+  font-weight: 400;
+  transition: background 0.12s, border-color 0.12s;
+}
+.tool-row:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+.tool-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+.tool-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--text-secondary);
+}
+.tool-icon svg {
+  width: 18px;
+  height: 18px;
+  opacity: 0.8;
+}
+.tool-label {
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* ---- 模式切换 ---- */
+.mode-switch {
+  display: flex;
+}
+.dir-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.dir-row .n-input {
+  flex: 1;
+}
+
+/* ---- 弹窗底部按钮 ---- */
+.modal-body-export .drawer-footer,
+.modal-body-edit .drawer-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 </style>
