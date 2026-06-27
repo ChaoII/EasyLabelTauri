@@ -174,19 +174,25 @@
         </div>
         <div class="field">
           <label class="field-label">导出格式</label>
-          <NSelect v-model:value="exportFormat" :options="exportFormatOptions" size="small" />
+          <NSelect v-model:value="exportFormat" :options="exportFormatOptions" size="small" :disabled="exporting" />
         </div>
         <div class="field">
           <label class="field-label">导出目录</label>
           <div class="dir-row">
-            <NInput v-model:value="exportDir" readonly size="small" placeholder="选择导出目录..." />
-            <NButton size="small" @click="pickExportDir">选择</NButton>
+            <NInput v-model:value="exportDir" readonly size="small" placeholder="选择导出目录..." :disabled="exporting" />
+            <NButton size="small" @click="pickExportDir" :disabled="exporting">选择</NButton>
           </div>
+        </div>
+        <div v-if="exporting" class="export-progress">
+          <div class="progress-bar-outer">
+            <div class="progress-bar-inner" :style="{ width: (exportProgress.total > 0 ? exportProgress.current / exportProgress.total * 100 : 0) + '%' }" />
+          </div>
+          <span class="progress-text">{{ exportProgress.message }} {{ exportProgress.total > 0 ? exportProgress.current + '/' + exportProgress.total : '' }}</span>
         </div>
       </div>
       <template #footer>
         <div class="drawer-footer">
-          <NButton size="small" @click="showExportModal = false">取消</NButton>
+          <NButton size="small" @click="showExportModal = false" :disabled="exporting">取消</NButton>
           <NButton size="small" type="primary" @click="handleExport" :loading="exporting">导出</NButton>
         </div>
       </template>
@@ -287,12 +293,14 @@ const exportFormat = ref("");
 const exportDir = ref("");
 const exportFormatOptions = computed(() => EXPORT_FORMATS[exportTarget.value?.task_type ?? ""] ?? []);
 const exporting = ref(false);
+const exportProgress = ref({ current: 0, total: 0, message: "" });
 
 function openExport(task: Task) {
   exportTarget.value = task;
   const formats = EXPORT_FORMATS[task.task_type];
   exportFormat.value = formats?.[0]?.value ?? "";
   exportDir.value = `${task.image_folder}/export_${exportFormat.value}`;
+  exportProgress.value = { current: 0, total: 0, message: "" };
   showExportModal.value = true;
 }
 
@@ -310,6 +318,13 @@ async function handleExport() {
     return;
   }
   exporting.value = true;
+  exportProgress.value = { current: 0, total: 0, message: "准备导出..." };
+  // 监听进度事件
+  const { listen } = await import("@tauri-apps/api/event");
+  const unlisten = await listen("export-progress", (event) => {
+    const p = event.payload as { current: number; total: number; message: string };
+    exportProgress.value = p;
+  });
   try {
     const outputPath = await invoke<string>("export_annotations", {
       request: {
@@ -325,6 +340,7 @@ async function handleExport() {
   } catch (e) {
     message.error(`导出失败: ${e instanceof Error ? e.message : String(e)}`);
   } finally {
+    unlisten();
     exporting.value = false;
   }
 }
@@ -722,6 +738,28 @@ function formatTime(iso: string): string {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+}
+.export-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.progress-bar-outer {
+  height: 6px;
+  background: var(--bg-elevated);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-bar-inner {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.progress-text {
+  font-size: 11px;
+  color: var(--text-secondary);
 }
 .dir-row {
   display: flex;

@@ -5,6 +5,7 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 use uuid::Uuid;
+use tauri::Emitter;
 
 // ==================== 文件夹/图片列表 ====================
 
@@ -1033,13 +1034,24 @@ fn export_classification_csv(images: &[String], classes: &[ExportClassDef], outp
 }
 
 #[tauri::command]
-pub fn export_annotations(request: ExportRequest) -> Result<String, String> {
+pub fn export_annotations(request: ExportRequest, app: tauri::AppHandle) -> Result<String, String> {
     let images = get_image_files(&request.image_folder)?;
     if images.is_empty() {
         return Err("没有找到图片文件".to_string());
     }
 
-    match (request.task_type.as_str(), request.export_format.as_str()) {
+    // 发送进度事件的闭包
+    let emit_progress = |current: usize, total: usize, msg: &str| {
+        let _ = app.emit("export-progress", serde_json::json!({
+            "current": current,
+            "total": total,
+            "message": msg
+        }));
+    };
+
+    emit_progress(0, images.len(), "开始导出...");
+
+    let result = match (request.task_type.as_str(), request.export_format.as_str()) {
         ("detection", "yolo") => export_yolo_detection(&images, &request.classes, &request.output_dir),
         ("rotated_detection", "yolo_obb") => export_yolo_obb(&images, &request.classes, &request.output_dir),
         ("segmentation", "yolo") => export_yolo_segmentation(&images, &request.classes, &request.output_dir),
@@ -1048,7 +1060,10 @@ pub fn export_annotations(request: ExportRequest) -> Result<String, String> {
         ("classification", "csv") => export_classification_csv(&images, &request.classes, &request.output_dir),
         ("ocr", "paddleocr") => export_paddleocr(&images, &request.classes, &request.output_dir),
         _ => Err(format!("不支持的任务类型 \"{}\" 与导出格式 \"{}\" 组合", request.task_type, request.export_format)),
-    }
+    };
+
+    emit_progress(images.len(), images.len(), "导出完成");
+    result
 }
 
 // ==================== 设置持久化 ====================
