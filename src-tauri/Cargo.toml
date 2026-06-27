@@ -26,6 +26,7 @@ thiserror.workspace = true
 dirs.workspace = true
 rand.workspace = true
 tokio.workspace = true
+modeldeploy.workspace = true
 
 [profile.release]
 panic = "abort"

@@ -512,6 +512,57 @@ pub fn get_annotation_statuses(image_folder: String) -> Result<Vec<ImageAnnotati
     Ok(result)
 }
 
+// ==================== AI 自动标注 ====================
+
+#[tauri::command]
+pub async fn auto_annotate(request: crate::auto_annotate::AutoAnnotateRequest, app: tauri::AppHandle) -> Result<crate::auto_annotate::AutoAnnotateResult, String> {
+    let images = get_image_files(&request.image_folder)?;
+    if images.is_empty() {
+        return Err("没有找到图片文件".to_string());
+    }
+
+    let total = images.len();
+    let _ = app.emit("auto-annotate-progress", serde_json::json!({"current": 0, "total": total, "message": "初始化模型..."}));
+
+    let result = tokio::task::spawn_blocking(move || {
+        match request.task_type.as_str() {
+            "detection" => {
+                let model_path = request.model_path.as_ref().ok_or("检测任务需要指定模型路径")?;
+                crate::auto_annotate::auto_detect(&images, model_path, &request.image_folder, &request.classes)
+            }
+            "rotated_detection" => {
+                let model_path = request.model_path.as_ref().ok_or("旋转框任务需要指定模型路径")?;
+                crate::auto_annotate::auto_obb(&images, model_path, &request.image_folder, &request.classes)
+            }
+            "segmentation" => {
+                let model_path = request.model_path.as_ref().ok_or("分割任务需要指定模型路径")?;
+                crate::auto_annotate::auto_segmentation(&images, model_path, &request.image_folder, &request.classes)
+            }
+            "keypoint" => {
+                let model_path = request.model_path.as_ref().ok_or("关键点任务需要指定模型路径")?;
+                crate::auto_annotate::auto_keypoint(&images, model_path, &request.image_folder, &request.classes)
+            }
+            "classification" => {
+                let model_path = request.model_path.as_ref().ok_or("分类任务需要指定模型路径")?;
+                crate::auto_annotate::auto_classification(&images, model_path, &request.image_folder, &request.classes)
+            }
+            "ocr" => {
+                let ocr_models = request.ocr_models.as_ref().ok_or("OCR任务需要指定模型配置")?;
+                crate::auto_annotate::auto_ocr(&images, ocr_models, &request.image_folder, &request.classes)
+            }
+            _ => Err(format!("不支持的任务类型: {}", request.task_type)),
+        }
+    }).await.map_err(|e| format!("自动标注线程错误: {}", e))??;
+
+    let _ = app.emit("auto-annotate-progress", serde_json::json!({
+        "current": result.total_images,
+        "total": result.total_images,
+        "message": format!("完成! 共标注 {} 张图片, {} 个标注", result.annotated_images, result.total_annotations)
+    }));
+
+    Ok(result)
+}
+
 // ==================== 标注导出 ====================
 
 #[derive(serde::Serialize, serde::Deserialize)]
