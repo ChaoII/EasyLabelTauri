@@ -65,9 +65,13 @@
           <div class="tool-sep" />
           <NTooltip trigger="hover" :delay="400" placement="right">
             <template #trigger>
-              <NButton quaternary block style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:36px;gap:2px;border-radius:6px !important;" @click="openAiAnnotate" title="AI 自动标注">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                <span style="font-size:11px;color:var(--text-dim);">AI标注</span>
+              <NButton quaternary block class="tool-row" @click="openAiAnnotate" title="AI 自动标注">
+                <span class="tool-inner">
+                  <span class="tool-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                  </span>
+                  <span class="tool-label">AI标注</span>
+                </span>
               </NButton>
             </template>
             AI 自动标注
@@ -281,7 +285,7 @@
         </div>
       </div>
       <template #footer>
-        <div style="display:flex; justify-content:flex-end; gap:8px; padding:8px 0;">
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
           <NButton size="small" @click="showAiAnnotateModal = false" :disabled="aiAnnotating">取消</NButton>
           <NButton size="small" type="primary" @click="handleAiAnnotate" :loading="aiAnnotating">开始标注</NButton>
         </div>
