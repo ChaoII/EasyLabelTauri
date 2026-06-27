@@ -61,6 +61,14 @@
               <component :is="tool.icon" />
             </ToolButton>
           </template>
+
+          <div class="tool-sep" />
+          <NButton quaternary size="tiny" class="ai-btn" @click="openAiAnnotate" title="AI 自动标注">
+            <template #icon>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            </template>
+            <span>AI</span>
+          </NButton>
         </div>
       </aside>
 
@@ -217,6 +225,62 @@
         <div class="modal-footer">
           <NButton size="small" @click="annEditVisible = false">取消</NButton>
           <NButton size="small" type="primary" @click="confirmAnnEdit">确认</NButton>
+        </div>
+      </template>
+    </NModal>
+
+    <!-- AI 自动标注弹窗 -->
+    <NModal v-model:show="showAiAnnotateModal" preset="card" title="AI 自动标注" :mask-closable="true" style="width: 440px">
+      <div class="modal-body-export">
+        <div class="field">
+          <label class="field-label">标注范围</label>
+          <div class="mode-switch">
+            <NButtonGroup size="small">
+              <NButton :type="aiAnnotateMode === 'current' ? 'primary' : 'default'" @click="aiAnnotateMode = 'current'">标注当前图片</NButton>
+              <NButton :type="aiAnnotateMode === 'all' ? 'primary' : 'default'" @click="aiAnnotateMode = 'all'">标注所有图片</NButton>
+            </NButtonGroup>
+          </div>
+        </div>
+        <div v-if="task?.task_type === 'ocr'" class="field">
+          <label class="field-label">检测模型 ONNX</label>
+          <div class="dir-row">
+            <NInput v-model:value="ocrDetModelPath" size="small" placeholder="选择 det 模型..." />
+            <NButton size="small" @click="pickAiModelFile('det')">选择</NButton>
+          </div>
+          <label class="field-label" style="margin-top:4px">识别模型 ONNX</label>
+          <div class="dir-row">
+            <NInput v-model:value="ocrRecModelPath" size="small" placeholder="选择 rec 模型..." />
+            <NButton size="small" @click="pickAiModelFile('rec')">选择</NButton>
+          </div>
+          <label class="field-label" style="margin-top:4px">分类模型 ONNX (可选)</label>
+          <div class="dir-row">
+            <NInput v-model:value="ocrClsModelPath" size="small" placeholder="选择 cls 模型..." />
+            <NButton size="small" @click="pickAiModelFile('cls')">选择</NButton>
+          </div>
+          <label class="field-label" style="margin-top:4px">字典文件</label>
+          <div class="dir-row">
+            <NInput v-model:value="ocrDictPath" size="small" placeholder="选择 dict.txt..." />
+            <NButton size="small" @click="pickAiModelFile('dict')">选择</NButton>
+          </div>
+        </div>
+        <div v-else class="field">
+          <label class="field-label">模型 ONNX 路径</label>
+          <div class="dir-row">
+            <NInput v-model:value="aiModelPath" size="small" placeholder="选择模型文件..." />
+            <NButton size="small" @click="pickAiModelFile('model')">选择</NButton>
+          </div>
+        </div>
+        <div v-if="aiAnnotating" class="export-progress">
+          <div class="progress-bar-outer">
+            <div class="progress-bar-inner" :style="{ width: (aiAnnotateProgress.total > 0 ? aiAnnotateProgress.current / aiAnnotateProgress.total * 100 : 0) + '%' }" />
+          </div>
+          <span class="progress-text">{{ aiAnnotateProgress.message }} {{ aiAnnotateProgress.total > 0 ? aiAnnotateProgress.current + '/' + aiAnnotateProgress.total : '' }}</span>
+        </div>
+      </div>
+      <template #footer>
+        <div class="drawer-footer">
+          <NButton size="small" @click="showAiAnnotateModal = false" :disabled="aiAnnotating">取消</NButton>
+          <NButton size="small" type="primary" @click="handleAiAnnotate" :loading="aiAnnotating">开始标注</NButton>
         </div>
       </template>
     </NModal>
@@ -381,6 +445,108 @@ const toolHint = computed(() => {
   };
   return h[activeTool.value] ?? "";
 });
+
+// ==================== AI 自动标注 ====================
+const showAiAnnotateModal = ref(false);
+const aiAnnotating = ref(false);
+const aiAnnotateMode = ref<"current" | "all">("current");
+const aiAnnotateProgress = ref({ current: 0, total: 0, message: "" });
+const aiModelPath = ref("");
+const ocrDetModelPath = ref("");
+const ocrRecModelPath = ref("");
+const ocrClsModelPath = ref("");
+const ocrDictPath = ref("");
+
+function openAiAnnotate() {
+  aiModelPath.value = "";
+  ocrDetModelPath.value = "";
+  ocrRecModelPath.value = "";
+  ocrClsModelPath.value = "";
+  ocrDictPath.value = "";
+  aiAnnotateMode.value = "current";
+  aiAnnotateProgress.value = { current: 0, total: 0, message: "" };
+  showAiAnnotateModal.value = true;
+}
+
+async function pickAiModelFile(type: string) {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const filters = type === "dict"
+    ? [{ name: "Text File", extensions: ["txt"] }, { name: "All Files", extensions: ["*"] }]
+    : [{ name: "ONNX Model", extensions: ["onnx"] }, { name: "All Files", extensions: ["*"] }];
+  const selected = await open({ multiple: false, filters, title: `选择${type}模型` });
+  if (selected) {
+    const p = typeof selected === "string" ? selected : Array.isArray(selected) ? selected[0] : "";
+    if (type === "model") aiModelPath.value = p;
+    else if (type === "det") ocrDetModelPath.value = p;
+    else if (type === "rec") ocrRecModelPath.value = p;
+    else if (type === "cls") ocrClsModelPath.value = p;
+    else if (type === "dict") ocrDictPath.value = p;
+  }
+}
+
+async function handleAiAnnotate() {
+  if (!task.value) return;
+  const t = task.value;
+
+  // 验证模型路径
+  if (t.task_type === "ocr") {
+    if (!ocrDetModelPath.value || !ocrRecModelPath.value || !ocrDictPath.value) {
+      message.warning("OCR 任务需要指定检测模型、识别模型和字典文件");
+      return;
+    }
+  } else {
+    if (!aiModelPath.value) {
+      message.warning("请选择模型 ONNX 文件");
+      return;
+    }
+  }
+
+  // 如果是全部标注且有已标注的图片，警告覆盖
+  if (aiAnnotateMode.value === "all") {
+    const annotatedCount = Object.values(store.imageAnnotationMap).filter(Boolean).length;
+    if (annotatedCount > 0) {
+      const confirmed = window.confirm(`当前有 ${annotatedCount} 张图片已标注，AI 标注所有图片将覆盖已有的标注，是否继续？`);
+      if (!confirmed) return;
+    }
+  }
+
+  aiAnnotating.value = true;
+  aiAnnotateProgress.value = { current: 0, total: 0, message: "正在加载模型..." };
+
+  // 监听进度事件
+  const { listen } = await import("@tauri-apps/api/event");
+  const unlisten = await listen("auto-annotate-progress", (event) => {
+    const p = event.payload as { current: number; total: number; message: string };
+    aiAnnotateProgress.value = p;
+  });
+
+  try {
+    const ocrModelsJson = t.task_type === "ocr" ? JSON.stringify({
+      det: ocrDetModelPath.value,
+      cls: ocrClsModelPath.value,
+      rec: ocrRecModelPath.value,
+      dict: ocrDictPath.value,
+    }) : null;
+
+    const result = await invoke<{ total_images: number; annotated_images: number; total_annotations: number }>("auto_annotate", {
+      request: {
+        image_folder: t.image_folder,
+        task_type: t.task_type,
+        classes: (t.classes ?? []).map(c => ({ id: c.id, name: c.name })),
+        model_path: aiModelPath.value || null,
+        ocr_models: ocrModelsJson,
+      },
+    });
+
+    message.success(`自动标注完成！共 ${result.annotated_images} 张图片，${result.total_annotations} 个标注`);
+    showAiAnnotateModal.value = false;
+  } catch (e) {
+    message.error(`自动标注失败: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    unlisten();
+    aiAnnotating.value = false;
+  }
+}
 
 // ==================== 生命周期 ====================
 onMounted(async () => {
@@ -1023,5 +1189,72 @@ const progressPct = computed(() =>
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* ---- AI 标注按钮 ---- */
+.ai-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 4px;
+}
+.ai-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* ---- AI 标注弹窗 ---- */
+.modal-body-export {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.modal-body-export .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.modal-body-export .field-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.mode-switch {
+  display: flex;
+}
+.dir-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.dir-row .n-input {
+  flex: 1;
+}
+.export-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.progress-bar-outer {
+  height: 6px;
+  background: var(--bg-elevated);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-bar-inner {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.progress-text {
+  font-size: 11px;
+  color: var(--text-secondary);
 }
 </style>

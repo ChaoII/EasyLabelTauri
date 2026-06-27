@@ -82,10 +82,6 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 <span>导出</span>
               </button>
-              <button class="footer-btn" title="AI自动标注" @click="openAutoAnnotate(task)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20z"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                <span>标注</span>
-              </button>
               <button class="footer-btn btn-danger" title="删除" @click="confirmDelete(task)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                 <span>删除</span>
@@ -198,57 +194,6 @@
         <div class="drawer-footer">
           <NButton size="small" @click="showExportModal = false" :disabled="exporting">取消</NButton>
           <NButton size="small" type="primary" @click="handleExport" :loading="exporting">导出</NButton>
-        </div>
-      </template>
-    </NModal>
-
-    <!-- 自动标注弹窗 -->
-    <NModal v-model:show="showAutoAnnotateModal" preset="card" title="AI 自动标注" :mask-closable="true" style="width: 480px">
-      <div class="modal-body-export">
-        <div class="field">
-          <label class="field-label">任务</label>
-          <div class="export-task-name">{{ autoAnnotateTarget?.name }} ({{ TASK_TYPE_LABELS[autoAnnotateTarget?.task_type ?? ''] }})</div>
-        </div>
-        <div v-if="autoAnnotateTarget?.task_type === 'ocr'" class="field">
-          <label class="field-label">检测模型 ONNX</label>
-          <div class="dir-row">
-            <NInput v-model:value="ocrDetModelPath" size="small" placeholder="选择 det 模型..." />
-            <NButton size="small" @click="pickModelFile('det')">选择</NButton>
-          </div>
-          <label class="field-label" style="margin-top:4px">识别模型 ONNX</label>
-          <div class="dir-row">
-            <NInput v-model:value="ocrRecModelPath" size="small" placeholder="选择 rec 模型..." />
-            <NButton size="small" @click="pickModelFile('rec')">选择</NButton>
-          </div>
-          <label class="field-label" style="margin-top:4px">分类模型 ONNX (可选)</label>
-          <div class="dir-row">
-            <NInput v-model:value="ocrClsModelPath" size="small" placeholder="选择 cls 模型..." />
-            <NButton size="small" @click="pickModelFile('cls')">选择</NButton>
-          </div>
-          <label class="field-label" style="margin-top:4px">字典文件</label>
-          <div class="dir-row">
-            <NInput v-model:value="ocrDictPath" size="small" placeholder="选择 dict.txt..." />
-            <NButton size="small" @click="pickModelFile('dict')">选择</NButton>
-          </div>
-        </div>
-        <div v-else class="field">
-          <label class="field-label">模型 ONNX 路径</label>
-          <div class="dir-row">
-            <NInput v-model:value="modelPath" size="small" placeholder="选择模型文件..." />
-            <NButton size="small" @click="pickModelFile('model')">选择</NButton>
-          </div>
-        </div>
-        <div v-if="autoAnnotating" class="export-progress">
-          <div class="progress-bar-outer">
-            <div class="progress-bar-inner" :style="{ width: (autoAnnotateProgress.total > 0 ? autoAnnotateProgress.current / autoAnnotateProgress.total * 100 : 0) + '%' }" />
-          </div>
-          <span class="progress-text">{{ autoAnnotateProgress.message }} {{ autoAnnotateProgress.total > 0 ? autoAnnotateProgress.current + '/' + autoAnnotateProgress.total : '' }}</span>
-        </div>
-      </div>
-      <template #footer>
-        <div class="drawer-footer">
-          <NButton size="small" @click="showAutoAnnotateModal = false" :disabled="autoAnnotating">取消</NButton>
-          <NButton size="small" type="primary" @click="handleAutoAnnotate" :loading="autoAnnotating">开始标注</NButton>
         </div>
       </template>
     </NModal>
@@ -402,102 +347,6 @@ async function handleExport() {
 
 function openTask(id: string) {
   projectStore.openTask(id);
-}
-
-// ==================== AI 自动标注 ====================
-const showAutoAnnotateModal = ref(false);
-const autoAnnotateTarget = ref<Task | null>(null);
-const autoAnnotating = ref(false);
-const autoAnnotateProgress = ref({ current: 0, total: 0, message: "" });
-const modelPath = ref("");
-const ocrDetModelPath = ref("");
-const ocrRecModelPath = ref("");
-const ocrClsModelPath = ref("");
-const ocrDictPath = ref("");
-
-function openAutoAnnotate(task: Task) {
-  autoAnnotateTarget.value = task;
-  modelPath.value = "";
-  ocrDetModelPath.value = "";
-  ocrRecModelPath.value = "";
-  ocrClsModelPath.value = "";
-  ocrDictPath.value = "";
-  autoAnnotateProgress.value = { current: 0, total: 0, message: "" };
-  showAutoAnnotateModal.value = true;
-}
-
-async function pickModelFile(type: string) {
-  const { open } = await import("@tauri-apps/plugin-dialog");
-  const selected = await open({
-    multiple: false,
-    filters: [{ name: "ONNX Model", extensions: ["onnx"] }, { name: "Text File", extensions: ["txt"] }, { name: "All Files", extensions: ["*"] }],
-    title: `选择${type}模型文件`,
-  });
-  if (selected) {
-    const path = typeof selected === "string" ? selected : Array.isArray(selected) ? selected[0] : "";
-    if (type === "model") modelPath.value = path;
-    else if (type === "det") ocrDetModelPath.value = path;
-    else if (type === "rec") ocrRecModelPath.value = path;
-    else if (type === "cls") ocrClsModelPath.value = path;
-    else if (type === "dict") ocrDictPath.value = path;
-  }
-}
-
-async function handleAutoAnnotate() {
-  if (!autoAnnotateTarget.value) return;
-  const t = autoAnnotateTarget.value;
-
-  // 验证模型路径
-  if (t.task_type === "ocr") {
-    if (!ocrDetModelPath.value || !ocrRecModelPath.value || !ocrDictPath.value) {
-      message.warning("OCR 任务需要指定检测模型、识别模型和字典文件");
-      return;
-    }
-  } else {
-    if (!modelPath.value) {
-      message.warning("请选择模型 ONNX 文件");
-      return;
-    }
-  }
-
-  autoAnnotating.value = true;
-  autoAnnotateProgress.value = { current: 0, total: 0, message: "正在加载模型..." };
-
-  // 监听进度事件
-  const { listen } = await import("@tauri-apps/api/event");
-  const unlisten = await listen("auto-annotate-progress", (event) => {
-    const p = event.payload as { current: number; total: number; message: string };
-    autoAnnotateProgress.value = p;
-  });
-
-  try {
-    const ocrModelsJson = t.task_type === "ocr" ? JSON.stringify({
-      det: ocrDetModelPath.value,
-      cls: ocrClsModelPath.value,
-      rec: ocrRecModelPath.value,
-      dict: ocrDictPath.value,
-    }) : null;
-
-    const result = await invoke<{ total_images: number; annotated_images: number; total_annotations: number }>("auto_annotate", {
-      request: {
-        image_folder: t.image_folder,
-        task_type: t.task_type,
-        classes: (t.classes ?? []).map(c => ({ id: c.id, name: c.name })),
-        model_path: modelPath.value || null,
-        ocr_models: ocrModelsJson,
-      },
-    });
-
-    message.success(`自动标注完成！共 ${result.annotated_images} 张图片，${result.total_annotations} 个标注`);
-    // 刷新任务列表统计
-    await projectStore.loadProject();
-    showAutoAnnotateModal.value = false;
-  } catch (e) {
-    message.error(`自动标注失败: ${e instanceof Error ? e.message : String(e)}`);
-  } finally {
-    unlisten();
-    autoAnnotating.value = false;
-  }
 }
 
 // ==================== 筛选 ====================
