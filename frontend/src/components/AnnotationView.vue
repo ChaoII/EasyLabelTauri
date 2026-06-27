@@ -564,8 +564,10 @@ async function handleAiAnnotate() {
 
     message.success(`自动标注完成！共 ${result.annotated_images} 张图片，${result.total_annotations} 个标注`);
     showAiAnnotateModal.value = false;
-    // 重新加载当前图片的标注
-    await loadImageFromPath(store.imagePath);
+    // 仅重新加载当前图片的标注，不触发 clearImage
+    const { invoke: inv } = await import("@tauri-apps/api/core");
+    const saved: any[] = await inv("load_annotations_for_image", { imagePath: store.imagePath });
+    store.annotations = saved;
   } catch (e) {
     message.error(`自动标注失败: ${e instanceof Error ? e.message : String(e)}`);
   } finally {
