@@ -95,7 +95,7 @@
               >
                 <span
                   class="ann-dot"
-                  :class="(imageAnnotationMap[img.path] ?? false) ? 'dot-done' : 'dot-pending'"
+                  :class="(store.imageAnnotationMap[img.path] ?? false) ? 'dot-done' : 'dot-pending'"
                 />
                 <span class="img-name">{{ img.name }}</span>
               </div>
@@ -225,7 +225,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
-import { NBadge, NModal, NSelect, NInput, NButton } from "naive-ui";
+import { NBadge, NModal, NSelect, NInput, NButton, useMessage } from "naive-ui";
 import {
   MousePointer2, Square, Pentagon, CircleDot, Type,
   Hand, ZoomIn, ChevronLeft, ChevronRight, RefreshCw,
@@ -250,13 +250,14 @@ const emit = defineEmits<{ (e: "back"): void }>();
 const store = useAppStore();
 const projectStore = useProjectStore();
 const settingsStore = useSettingsStore();
+const message = useMessage();
 
 const task = computed(() => projectStore.tasks.find((t) => t.id === props.taskId));
 const classificationMode = computed(() => task.value?.config?.classification_mode ?? "multi");
 const taskImages = ref<ImageInfo[]>([]);
 const currentImageIndex = ref(0);
 // eslint-disable-next-line
-const imageAnnotationMap = ref({} as Record<string, boolean>);
+// 直接使用 store.imageAnnotationMap，无需本地包装
 const selectedClassId = ref(0);
 watch(() => store.classes.length, (len) => {
   if (len > 0) {
@@ -336,11 +337,11 @@ function onKeyDown(e: KeyboardEvent) {
 
   // 左右箭头 切换图片
   if (key === "arrowleft" || key === "a") {
-    if (store.hasPrevImage) goToPrevImage();
+    goToPrevImage();
     return;
   }
   if (key === "arrowright" || key === "d") {
-    if (store.hasNextImage) goToNextImage();
+    goToNextImage();
     return;
   }
 
@@ -399,12 +400,12 @@ onBeforeUnmount(() => {
 // 为每张图单独发起标注查询，查完才更新（不阻塞首图展示）
 async function loadAnnotationStatus(idx: number) {
   const img = taskImages.value[idx];
-  if (!img || imageAnnotationMap.value[img.path] !== undefined) return; // 已有则跳过
+  if (!img || store.imageAnnotationMap[img.path] !== undefined) return; // 已有则跳过
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     const anns = await invoke<any[]>("load_annotations_for_image", { imagePath: img.path });
-    imageAnnotationMap.value[img.path] = anns.length > 0;
-  } catch { imageAnnotationMap.value[img.path] = false; }
+    store.imageAnnotationMap[img.path] = anns.length > 0;
+  } catch { store.imageAnnotationMap[img.path] = false; }
 }
 
 async function loadTaskImages() {
@@ -421,12 +422,22 @@ async function loadTaskImages() {
       await loadImageFromPath(result.images[0].path);
     }
 
-    // 标注状态后台按需加载：只查当前图及附近几张，其余等滚动到时再查
-    const initialIndices = [0];
-    if (result.images.length > 1) initialIndices.push(1);
-    if (result.images.length > 2) initialIndices.push(2);
-
-    await Promise.all(initialIndices.map((i) => loadAnnotationStatus(i)));
+    // 批量查询所有图片的标注状态（不阻塞 UI）
+    (async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const statuses = await invoke<{ path: string; has_annotations: boolean }[]>("get_annotation_statuses", {
+          imageFolder: task.value!.image_folder,
+        });
+        for (const s of statuses) {
+          store.imageAnnotationMap[s.path] = s.has_annotations;
+        }
+      } catch (e) {
+        console.error("批量查询标注状态失败:", e);
+        // fallback: 只查当前图
+        if (result.images.length > 0) await loadAnnotationStatus(0);
+      }
+    })();
   } catch (e) {
     console.error("加载图片目录失败:", e);
   }
@@ -490,11 +501,19 @@ function goToImage(idx: number) {
 }
 
 function goToNextImage() {
-  if (currentImageIndex.value < taskImages.value.length - 1) goToImage(currentImageIndex.value + 1);
+  if (currentImageIndex.value < taskImages.value.length - 1) {
+    goToImage(currentImageIndex.value + 1);
+  } else {
+    message.warning("已经是最后一张图片");
+  }
 }
 
 function goToPrevImage() {
-  if (currentImageIndex.value > 0) goToImage(currentImageIndex.value - 1);
+  if (currentImageIndex.value > 0) {
+    goToImage(currentImageIndex.value - 1);
+  } else {
+    message.warning("已经是第一张图片");
+  }
 }
 
 async function reloadFolder() {
@@ -513,8 +532,8 @@ async function saveCurrentAnnotations() {
       imagePath: store.imagePath,
       annotations: store.annotations,
     });
-    imageAnnotationMap.value[store.imagePath] = store.annotations.length > 0;
-    const annotated = Object.values(imageAnnotationMap.value).filter(Boolean).length;
+    store.imageAnnotationMap[store.imagePath] = store.annotations.length > 0;
+    const annotated = Object.values(store.imageAnnotationMap).filter(Boolean).length;
     await projectStore.updateTaskStats(props.taskId, { annotated_images: annotated });
   } catch (e) {
     console.error("保存失败:", e);
@@ -566,7 +585,7 @@ function confirmAnnEdit() {
 
 // ==================== 统计 ====================
 const annotatedCount = computed(() =>
-  Object.values(imageAnnotationMap.value).filter(Boolean).length
+  Object.values(store.imageAnnotationMap).filter(Boolean).length
 );
 const totalCount = computed(() => taskImages.value.length);
 const progressPct = computed(() =>

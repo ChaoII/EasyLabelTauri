@@ -487,6 +487,30 @@ pub fn save_project_list(file_name: String, data: serde_json::Value) -> Result<(
     Ok(())
 }
 
+
+// ==================== 批量标注状态查询 ====================
+
+#[derive(serde::Serialize)]
+pub struct ImageAnnotationStatus {
+    pub path: String,
+    pub has_annotations: bool,
+}
+
+#[tauri::command]
+pub fn get_annotation_statuses(image_folder: String) -> Result<Vec<ImageAnnotationStatus>, String> {
+    let images = get_image_files(&image_folder)?;
+    let mut result = Vec::new();
+    for img_path in &images {
+        let ann_path = annotations_path_for_image(img_path);
+        let has_annotations = ann_path.exists();
+        result.push(ImageAnnotationStatus {
+            path: img_path.clone(),
+            has_annotations,
+        });
+    }
+    Ok(result)
+}
+
 // ==================== 标注导出 ====================
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -726,27 +750,250 @@ fn export_coco_json(images: &[String], classes: &[ExportClassDef], task_type: &s
 }
 
 /// 生成 PaddleOCR 格式
-fn export_paddleocr(images: &[String], classes: &[ExportClassDef], output_dir: &str) -> Result<String, String> {
-    fs::create_dir_all(output_dir).map_err(|e| format!("创建导出目录失败: {}", e))?;
+use image::GenericImageView;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 
-    for img_path in images {
-        let annotations = load_annotations(img_path)?;
-        let path = Path::new(img_path);
-        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
-        let mut lines = Vec::new();
-        for ann in &annotations {
-            if let Annotation::Ocr(o) = ann {
-                let pts: Vec<String> = o.points.iter().map(|p| format!("[{:.6},{:.6}]", p.x, p.y)).collect();
-                let transcription = if o.text.is_empty() { "###" } else { &o.text };
-                lines.push(format!("[{}]\t{}", pts.join(","), transcription));
+/// 仿射变换校正：旋转图片使文字水平，采用双线性插值
+/// 透视变换校正：将四边形文字区域映射到正矩形（标准 OCR 做法）
+/// 参考 PPOCRLabel 的 get_rotate_crop_image 实现
+fn rectify_crop(img: &image::DynamicImage, pts: &[(u32, u32)], src_stem: &str, idx: usize, base: &std::path::Path) -> String {
+    use image::GenericImageView;
+
+    // 1. 检查顺时针/逆时针（Green 定理求有向面积）
+    let mut pts_f = pts.iter().map(|p| [p.0 as f64, p.1 as f64]).collect::<Vec<_>>();
+    let mut d = 0.0;
+    for i in 0..4 {
+        let j = (i + 1) % 4;
+        d += -0.5 * (pts_f[j][1] + pts_f[i][1]) * (pts_f[j][0] - pts_f[i][0]);
+    }
+    if d < 0.0 {
+        // 逆时针 -> 交换 point[1] 和 point[3]
+        pts_f.swap(1, 3);
+    }
+
+    // 2. 计算输出宽高
+    let w1 = ((pts_f[0][0] - pts_f[1][0]).powi(2) + (pts_f[0][1] - pts_f[1][1]).powi(2)).sqrt();
+    let w2 = ((pts_f[2][0] - pts_f[3][0]).powi(2) + (pts_f[2][1] - pts_f[3][1]).powi(2)).sqrt();
+    let h1 = ((pts_f[0][0] - pts_f[3][0]).powi(2) + (pts_f[0][1] - pts_f[3][1]).powi(2)).sqrt();
+    let h2 = ((pts_f[1][0] - pts_f[2][0]).powi(2) + (pts_f[1][1] - pts_f[2][1]).powi(2)).sqrt();
+    let dst_w = w1.max(w2).ceil().max(1.0) as u32;
+    let dst_h = h1.max(h2).ceil().max(1.0) as u32;
+
+    // 3. 计算透视变换矩阵（DLT 算法）
+    // 源点: pts_f (4x2), 目标点: 标准矩形
+    let dst = [
+        [0.0, 0.0],
+        [dst_w as f64 - 1.0, 0.0],
+        [dst_w as f64 - 1.0, dst_h as f64 - 1.0],
+        [0.0, dst_h as f64 - 1.0],
+    ];
+
+    // 构建 8x8 矩阵和 8x1 向量（Ax = b）
+    let mut a = [[0.0f64; 8]; 8];
+    let mut b = [0.0f64; 8];
+    for i in 0..4 {
+        let r = i * 2;
+        let x = pts_f[i][0]; let y = pts_f[i][1];
+        let u = dst[i][0]; let v = dst[i][1];
+        a[r] = [x, y, 1.0, 0.0, 0.0, 0.0, -u * x, -u * y];
+        a[r + 1] = [0.0, 0.0, 0.0, x, y, 1.0, -v * x, -v * y];
+        b[r] = u;
+        b[r + 1] = v;
+    }
+
+    // 高斯消元求解 8 个参数
+    let mut h = [0.0f64; 8];
+    for col in 0..8 {
+        let mut max_row = col;
+        for row in (col + 1)..8 {
+            if a[row][col].abs() > a[max_row][col].abs() { max_row = row; }
+        }
+        a.swap(col, max_row);
+        b.swap(col, max_row);
+        let pivot = a[col][col];
+        if pivot.abs() < 1e-12 { continue; }
+        for j in col..8 { a[col][j] /= pivot; }
+        b[col] /= pivot;
+        for row in 0..8 {
+            if row != col && a[row][col].abs() > 1e-12 {
+                let factor = a[row][col];
+                for j in col..8 { a[row][j] -= factor * a[col][j]; }
+                b[row] -= factor * b[col];
             }
         }
-        if !lines.is_empty() {
-            fs::write(format!("{}/{}_ocr.txt", output_dir, file_name), lines.join("\n"))
-                .map_err(|e| format!("写入 OCR 文件失败: {}", e))?;
+    }
+    for i in 0..8 { h[i] = b[i]; }
+    let hm = [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1.0]; // 3x3 矩阵
+
+    // 4. warpPerspective: 遍历输出像素，逆映射回源图采样
+    let rgba = img.to_rgba8();
+    let (src_w, src_h) = (rgba.width(), rgba.height());
+    let mut out = image::RgbaImage::new(dst_w, dst_h);
+
+    for oy in 0..dst_h {
+        for ox in 0..dst_w {
+            // 逆映射
+            let denom = hm[6] * ox as f64 + hm[7] * oy as f64 + hm[8];
+            let sx = (hm[0] * ox as f64 + hm[1] * oy as f64 + hm[2]) / denom;
+            let sy = (hm[3] * ox as f64 + hm[4] * oy as f64 + hm[5]) / denom;
+
+            if sx >= 0.0 && sx < src_w as f64 - 1.0 && sy >= 0.0 && sy < src_h as f64 - 1.0 {
+                let ix = sx.floor() as u32;
+                let iy = sy.floor() as u32;
+                let fx = sx - ix as f64;
+                let fy = sy - iy as f64;
+                let p00 = rgba.get_pixel(ix, iy);
+                let p10 = rgba.get_pixel((ix + 1).min(src_w - 1), iy);
+                let p01 = rgba.get_pixel(ix, (iy + 1).min(src_h - 1));
+                let p11 = rgba.get_pixel((ix + 1).min(src_w - 1), (iy + 1).min(src_h - 1));
+                let r = ((1.0-fx)*(1.0-fy)*p00[0] as f64 + fx*(1.0-fy)*p10[0] as f64 + (1.0-fx)*fy*p01[0] as f64 + fx*fy*p11[0] as f64) as u8;
+                let g = ((1.0-fx)*(1.0-fy)*p00[1] as f64 + fx*(1.0-fy)*p10[1] as f64 + (1.0-fx)*fy*p01[1] as f64 + fx*fy*p11[1] as f64) as u8;
+                let b = ((1.0-fx)*(1.0-fy)*p00[2] as f64 + fx*(1.0-fy)*p10[2] as f64 + (1.0-fx)*fy*p01[2] as f64 + fx*fy*p11[2] as f64) as u8;
+                out.put_pixel(ox, oy, image::Rgba([r, g, b, 255]));
+            }
         }
     }
-    Ok(std::env::current_dir().map_err(|e| format!("获取当前目录失败: {}", e))?.join(output_dir).to_string_lossy().to_string())
+
+    // 5. 检测竖排文字：高/宽 >= 1.5 时旋转 90 度
+    let result = if dst_h as f64 / dst_w as f64 >= 1.5 {
+        let rotated = image::DynamicImage::ImageRgba8(out).rotate90();
+        rotated.to_rgba8()
+    } else {
+        out
+    };
+
+    // 6. 裁剪图片命名 + 保存
+    let crop_name = format!("{}_{:06}.png", src_stem, idx);
+    let crop_path = base.join("rec").join("images").join(&crop_name);
+    let _ = result.save(&crop_path);
+    crop_name
+}
+fn export_paddleocr(images: &[String], classes: &[ExportClassDef], output_dir: &str) -> Result<String, String> {
+    use image::GenericImageView;
+    use rand::seq::SliceRandom;
+    use rand::thread_rng;
+
+    let base = std::path::Path::new(output_dir);
+    let det_img_dir = base.join("det").join("images");
+    let rec_img_dir = base.join("rec").join("images");
+    fs::create_dir_all(&det_img_dir).map_err(|e| format!("创建目录失败: {}", e))?;
+    fs::create_dir_all(&rec_img_dir).map_err(|e| format!("创建目录失败: {}", e))?;
+
+    struct OcrEntry {
+        img_path: String,
+        transcription: String,
+        points: Vec<(u32, u32)>,
+        src_idx: usize,
+    }
+    let mut entries = Vec::new();
+    let mut global_idx: usize = 0;
+
+    for (src_idx, img_path) in images.iter().enumerate() {
+        let annotations = load_annotations(img_path)?;
+        let path = std::path::Path::new(img_path);
+        let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("jpg");
+        let det_dest = det_img_dir.join(&file_name);
+        // 拷贝原图到 det/images/
+        let _ = std::fs::copy(img_path, &det_dest);
+
+        let (img_w, img_h) = match image::ImageReader::open(img_path).map_err(|e| format!("打开图片失败: {}", e))?.into_dimensions() {
+            Ok(d) => (d.0 as f64, d.1 as f64),
+            Err(_) => (1920.0, 1080.0),
+        };
+        for ann in &annotations {
+            if let Annotation::Ocr(o) = ann {
+                let pts: Vec<(u32, u32)> = o.points.iter().map(|p| ((p.x * img_w) as u32, (p.y * img_h) as u32)).collect();
+                if pts.len() < 4 { continue; }
+                global_idx += 1;
+                entries.push(OcrEntry {
+                    img_path: img_path.clone(),
+                    transcription: if o.text.is_empty() { "###".to_string() } else { o.text.clone() },
+                    points: pts,
+                    src_idx,
+                });
+            }
+        }
+        // 没有OCR标注但属于det数据集，仍保留图片引用
+        if entries.iter().any(|e| e.src_idx == src_idx) {
+            continue; // 已在entries里
+        }
+    }
+
+    if entries.is_empty() {
+        return Err("没有 OCR 标注数据".to_string());
+    }
+
+    let mut rng = thread_rng();
+    entries.shuffle(&mut rng);
+    let split_idx = (entries.len() as f64 * 0.8).ceil() as usize;
+    let train = &entries[..split_idx];
+    let val = &entries[split_idx..];
+
+    // dict.txt
+    let mut chars: Vec<char> = entries.iter().flat_map(|e| e.transcription.chars()).collect();
+    chars.sort(); chars.dedup();
+    fs::write(base.join("rec").join("dict.txt"), chars.iter().map(|c| c.to_string()).collect::<Vec<_>>().join("\n"))
+        .map_err(|e| format!("写入 dict.txt 失败: {}", e))?;
+
+    fn write_split(base: &std::path::Path, split_name: &str, split_entries: &[OcrEntry], img_map: &mut std::collections::HashSet<String>) -> Result<(), String> {
+        let mut det_lines = Vec::new();
+        let mut rec_lines = Vec::new();
+
+        // 收集该 split 涉及的所有源图片
+        for e in split_entries {
+            let p = std::path::Path::new(&e.img_path);
+            let fname = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+            img_map.insert(fname.clone());
+        }
+
+        // 按图片分组生成 det 行
+        let mut det_map: std::collections::BTreeMap<String, Vec<&OcrEntry>> = std::collections::BTreeMap::new();
+        for e in split_entries {
+            det_map.entry(e.img_path.clone()).or_default().push(e);
+        }
+        for (img_key, boxes) in &det_map {
+            let p = std::path::Path::new(img_key);
+            let fname = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let det_entry = format!("images/{}", fname);
+            let json_parts: Vec<String> = boxes.iter().map(|b| {
+                format!("{{\"transcription\": \"{}\", \"label\": \"text\", \"points\": [[{},{}],[{},{}],[{},{}],[{},{}]], \"difficult\": false, \"id\": null, \"linking\": []}}",
+                    b.transcription.replace('"', "\\\""),
+                    b.points[0].0, b.points[0].1,
+                    b.points[1].0, b.points[1].1,
+                    b.points[2].0, b.points[2].1,
+                    b.points[3].0, b.points[3].1,
+                )
+            }).collect();
+            det_lines.push(format!("{}\t[{}]", det_entry, json_parts.join(",")));
+        }
+
+        // rec 行 + 裁剪校正
+        for (i, e) in split_entries.iter().enumerate() {
+            if let Ok(img) = image::ImageReader::open(&e.img_path).map_err(|_| "打开图片失败")?.decode() {
+                let stem = std::path::Path::new(&e.img_path).file_stem().unwrap_or_default().to_string_lossy();
+                let crop_name = rectify_crop(&img, &e.points, &stem, i, base);
+                rec_lines.push(format!("images/{}\t{}", crop_name, e.transcription.replace('\n', " ")));
+            }
+        }
+
+        if !det_lines.is_empty() {
+            fs::write(base.join("det").join(format!("{}.txt", split_name)), det_lines.join("\n"))
+                .map_err(|e| format!("写入 det/{}.txt 失败: {}", split_name, e))?;
+        }
+        if !rec_lines.is_empty() {
+            fs::write(base.join("rec").join(format!("{}.txt", split_name)), rec_lines.join("\n"))
+                .map_err(|e| format!("写入 rec/{}.txt 失败: {}", split_name, e))?;
+        }
+        Ok(())
+    }
+
+    let mut img_map = std::collections::HashSet::new();
+    write_split(base, "train", train, &mut img_map)?;
+    write_split(base, "val", val, &mut img_map)?;
+
+    Ok(output_dir.to_string())
 }
 
 /// 生成 CSV 格式（分类）
