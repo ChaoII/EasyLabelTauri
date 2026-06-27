@@ -878,10 +878,13 @@ fn rectify_crop(img: &image::DynamicImage, pts: &[(u32, u32)], src_stem: &str, i
     }
     crop_name
 }
-fn export_paddleocr(images: &[String], classes: &[ExportClassDef], output_dir: &str) -> Result<String, String> {
+fn export_paddleocr(images: &[String], classes: &[ExportClassDef], output_dir: &str, app: &tauri::AppHandle) -> Result<String, String> {
     use image::GenericImageView;
     use rand::seq::SliceRandom;
     use rand::thread_rng;
+
+    let total = images.len();
+    let _ = app.emit("export-progress", serde_json::json!({"current": 0, "total": total, "message": "收集 OCR 标注数据..."}));
 
     let base = std::path::Path::new(output_dir);
     let det_img_dir = base.join("det").join("images");
@@ -899,6 +902,7 @@ fn export_paddleocr(images: &[String], classes: &[ExportClassDef], output_dir: &
     let mut global_idx: usize = 0;
 
     for (src_idx, img_path) in images.iter().enumerate() {
+        let _ = app.emit("export-progress", serde_json::json!({"current": src_idx + 1, "total": total, "message": format!("拷贝原图 ({}/{})...", src_idx + 1, total)}));
         let annotations = load_annotations(img_path)?;
         let path = std::path::Path::new(img_path);
         let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
@@ -946,7 +950,7 @@ fn export_paddleocr(images: &[String], classes: &[ExportClassDef], output_dir: &
     fs::write(base.join("rec").join("dict.txt"), chars.iter().map(|c| c.to_string()).collect::<Vec<_>>().join("\n"))
         .map_err(|e| format!("写入 dict.txt 失败: {}", e))?;
 
-    fn write_split(base: &std::path::Path, split_name: &str, split_entries: &[OcrEntry], img_map: &mut std::collections::HashSet<String>) -> Result<(), String> {
+    fn write_split(base: &std::path::Path, split_name: &str, split_entries: &[OcrEntry], img_map: &mut std::collections::HashSet<String>, app: &tauri::AppHandle) -> Result<(), String> {
         let mut det_lines = Vec::new();
         let mut rec_lines = Vec::new();
 
@@ -979,7 +983,9 @@ fn export_paddleocr(images: &[String], classes: &[ExportClassDef], output_dir: &
         }
 
         // rec 行 + 裁剪校正
+        let rec_total = split_entries.len();
         for (i, e) in split_entries.iter().enumerate() {
+            let _ = app.emit("export-progress", serde_json::json!({"current": i + 1, "total": rec_total, "message": format!("生成识别数据 ({}/{}): {}", i + 1, rec_total, split_name)}));
             if let Ok(img) = image::ImageReader::open(&e.img_path).map_err(|_| "打开图片失败")?.decode() {
                 log::info!("[write_split] i={} img_path={} dims={}x{}", i, e.img_path, img.width(), img.height());
                 let stem = std::path::Path::new(&e.img_path).file_stem().unwrap_or_default().to_string_lossy();
@@ -1000,8 +1006,8 @@ fn export_paddleocr(images: &[String], classes: &[ExportClassDef], output_dir: &
     }
 
     let mut img_map = std::collections::HashSet::new();
-    write_split(base, "train", train, &mut img_map)?;
-    write_split(base, "val", val, &mut img_map)?;
+    write_split(base, "train", train, &mut img_map, app)?;
+    write_split(base, "val", val, &mut img_map, app)?;
 
     Ok(output_dir.to_string())
 }
@@ -1034,35 +1040,32 @@ fn export_classification_csv(images: &[String], classes: &[ExportClassDef], outp
 }
 
 #[tauri::command]
-pub fn export_annotations(request: ExportRequest, app: tauri::AppHandle) -> Result<String, String> {
+pub async fn export_annotations(request: ExportRequest, app: tauri::AppHandle) -> Result<String, String> {
     let images = get_image_files(&request.image_folder)?;
     if images.is_empty() {
         return Err("没有找到图片文件".to_string());
     }
 
-    // 发送进度事件的闭包
-    let emit_progress = |current: usize, total: usize, msg: &str| {
-        let _ = app.emit("export-progress", serde_json::json!({
-            "current": current,
-            "total": total,
-            "message": msg
-        }));
-    };
+    let total = images.len();
+    let _ = app.emit("export-progress", serde_json::json!({"current": 0, "total": total, "message": "准备导出..."}));
 
-    emit_progress(0, images.len(), "开始导出...");
+    let app2 = app.clone();
+    // 在阻塞线程中执行导出，避免卡住 UI
+    let result = tokio::task::spawn_blocking(move || {
+        let _ = app2.emit("export-progress", serde_json::json!({"current": 0, "total": total, "message": "正在导出..."}));
+        match (request.task_type.as_str(), request.export_format.as_str()) {
+            ("detection", "yolo") => export_yolo_detection(&images, &request.classes, &request.output_dir),
+            ("rotated_detection", "yolo_obb") => export_yolo_obb(&images, &request.classes, &request.output_dir),
+            ("segmentation", "yolo") => export_yolo_segmentation(&images, &request.classes, &request.output_dir),
+            ("segmentation", "coco_json") | ("keypoint", "coco_json") => export_coco_json(&images, &request.classes, &request.task_type, &request.output_dir),
+            ("classification", "yolo") => export_yolo_classification(&images, &request.classes, &request.output_dir),
+            ("classification", "csv") => export_classification_csv(&images, &request.classes, &request.output_dir),
+            ("ocr", "paddleocr") => export_paddleocr(&images, &request.classes, &request.output_dir, &app2),
+            _ => Err(format!("不支持的任务类型 \"{}\" 与导出格式 \"{}\" 组合", request.task_type, request.export_format)),
+        }
+    }).await.map_err(|e| format!("导出线程错误: {}", e))?;
 
-    let result = match (request.task_type.as_str(), request.export_format.as_str()) {
-        ("detection", "yolo") => export_yolo_detection(&images, &request.classes, &request.output_dir),
-        ("rotated_detection", "yolo_obb") => export_yolo_obb(&images, &request.classes, &request.output_dir),
-        ("segmentation", "yolo") => export_yolo_segmentation(&images, &request.classes, &request.output_dir),
-        ("segmentation", "coco_json") | ("keypoint", "coco_json") => export_coco_json(&images, &request.classes, &request.task_type, &request.output_dir),
-        ("classification", "yolo") => export_yolo_classification(&images, &request.classes, &request.output_dir),
-        ("classification", "csv") => export_classification_csv(&images, &request.classes, &request.output_dir),
-        ("ocr", "paddleocr") => export_paddleocr(&images, &request.classes, &request.output_dir),
-        _ => Err(format!("不支持的任务类型 \"{}\" 与导出格式 \"{}\" 组合", request.task_type, request.export_format)),
-    };
-
-    emit_progress(images.len(), images.len(), "导出完成");
+    let _ = app.emit("export-progress", serde_json::json!({"current": total, "total": total, "message": "导出完成"}));
     result
 }
 

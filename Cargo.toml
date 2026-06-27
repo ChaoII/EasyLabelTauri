@@ -23,6 +23,7 @@ tauri-plugin-dialog = "2.0"
 tauri-plugin-fs = "2.0"
 tauri-build = { version = "2.0", features = [] }
 dirs = "5.0"
+tokio = { version = "1", features = ["rt-multi-thread"] }
 
 [profile.release]
 panic = "abort"

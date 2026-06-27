@@ -42,6 +42,7 @@ fn main() {
             load_settings,
             save_settings,
             export_annotations,
+            get_annotation_statuses,
         ])
         .run(tauri::generate_context!())
         .expect("启动失败");

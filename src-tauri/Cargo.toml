@@ -25,6 +25,7 @@ env_logger.workspace = true
 thiserror.workspace = true
 dirs.workspace = true
 rand.workspace = true
+tokio.workspace = true
 
 [profile.release]
 panic = "abort"
