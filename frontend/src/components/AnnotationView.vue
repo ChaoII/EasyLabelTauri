@@ -70,7 +70,7 @@
                   <span class="tool-icon">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
                   </span>
-                  <span class="tool-label">AI</span>
+                  <span class="tool-label">AI标注</span>
                 </span>
               </NButton>
             </template>
@@ -530,6 +530,9 @@ async function handleAiAnnotate() {
     }
   }
 
+  // 标注当前图片时传入当前图片路径
+  const currentImage = aiAnnotateMode.value === "current" && store.imagePath ? store.imagePath : null;
+
   aiAnnotating.value = true;
   aiAnnotateProgress.value = { current: 0, total: 0, message: "正在加载模型..." };
 
@@ -555,11 +558,14 @@ async function handleAiAnnotate() {
         classes: (t.classes ?? []).map(c => ({ id: c.id, name: c.name })),
         model_path: aiModelPath.value || null,
         ocr_models: ocrModelsJson,
+        current_image: currentImage,
       },
     });
 
     message.success(`自动标注完成！共 ${result.annotated_images} 张图片，${result.total_annotations} 个标注`);
     showAiAnnotateModal.value = false;
+    // 重新加载当前图片的标注
+    await loadImageFromPath(store.imagePath);
   } catch (e) {
     message.error(`自动标注失败: ${e instanceof Error ? e.message : String(e)}`);
   } finally {

@@ -516,10 +516,17 @@ pub fn get_annotation_statuses(image_folder: String) -> Result<Vec<ImageAnnotati
 
 #[tauri::command]
 pub async fn auto_annotate(request: crate::auto_annotate::AutoAnnotateRequest, app: tauri::AppHandle) -> Result<crate::auto_annotate::AutoAnnotateResult, String> {
-    let images = get_image_files(&request.image_folder)?;
-    if images.is_empty() {
+    let all_images = get_image_files(&request.image_folder)?;
+    if all_images.is_empty() {
         return Err("没有找到图片文件".to_string());
     }
+
+    // 如果指定了当前图片，只处理该图片
+    let images = if let Some(ref current) = request.current_image {
+        vec![current.clone()]
+    } else {
+        all_images.clone()
+    };
 
     let total = images.len();
     let _ = app.emit("auto-annotate-progress", serde_json::json!({"current": 0, "total": total, "message": "初始化模型..."}));

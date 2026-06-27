@@ -14,6 +14,8 @@ pub struct AutoAnnotateRequest {
     pub model_path: Option<String>,
     /// OCR 模型路径 (JSON 格式: {"det": "...", "cls": "...", "rec": "...", "dict": "..."})
     pub ocr_models: Option<String>,
+    /// 仅标注当前图片 (为 None 时标注全部)
+    pub current_image: Option<String>,
 }
 
 #[derive(serde::Serialize)]
