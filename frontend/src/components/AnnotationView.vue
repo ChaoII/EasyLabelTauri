@@ -63,12 +63,19 @@
           </template>
 
           <div class="tool-sep" />
-          <NButton quaternary size="tiny" class="ai-btn" @click="openAiAnnotate" title="AI 自动标注">
-            <template #icon>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          <NTooltip trigger="hover" :delay="400" placement="right">
+            <template #trigger>
+              <NButton quaternary block class="tool-row" @click="openAiAnnotate" title="AI 自动标注">
+                <span class="tool-inner">
+                  <span class="tool-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                  </span>
+                  <span class="tool-label">AI</span>
+                </span>
+              </NButton>
             </template>
-            <span>AI</span>
-          </NButton>
+            AI 自动标注
+          </NTooltip>
         </div>
       </aside>
 
@@ -278,18 +285,24 @@
         </div>
       </div>
       <template #footer>
-        <div class="drawer-footer">
+        <div class="modal-body-edit modal-footer">
           <NButton size="small" @click="showAiAnnotateModal = false" :disabled="aiAnnotating">取消</NButton>
           <NButton size="small" type="primary" @click="handleAiAnnotate" :loading="aiAnnotating">开始标注</NButton>
         </div>
       </template>
+    </NModal>
+
+    <!-- 确认覆盖弹窗 -->
+    <NModal v-model:show="showConfirmModal" preset="dialog" title="确认覆盖" positive-text="继续" negative-text="取消" type="warning" @positive-click="confirmResolve?.(true)" @negative-click="confirmResolve?.(false)">
+      {{ confirmMessage }}
     </NModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
-import { NBadge, NModal, NSelect, NInput, NButton, useMessage } from "naive-ui";
+import { NBadge, NModal, NSelect, NInput, NButton, NButtonGroup, NTooltip, useMessage } from "naive-ui";
+import { invoke } from "@tauri-apps/api/core";
 import {
   MousePointer2, Square, Pentagon, CircleDot, Type,
   Hand, ZoomIn, ChevronLeft, ChevronRight, RefreshCw,
@@ -456,6 +469,9 @@ const ocrDetModelPath = ref("");
 const ocrRecModelPath = ref("");
 const ocrClsModelPath = ref("");
 const ocrDictPath = ref("");
+const showConfirmModal = ref(false);
+const confirmMessage = ref("");
+let confirmResolve: ((v: boolean) => void) | null = null;
 
 function openAiAnnotate() {
   aiModelPath.value = "";
@@ -505,7 +521,11 @@ async function handleAiAnnotate() {
   if (aiAnnotateMode.value === "all") {
     const annotatedCount = Object.values(store.imageAnnotationMap).filter(Boolean).length;
     if (annotatedCount > 0) {
-      const confirmed = window.confirm(`当前有 ${annotatedCount} 张图片已标注，AI 标注所有图片将覆盖已有的标注，是否继续？`);
+      const confirmed = await new Promise<boolean>((resolve) => {
+        confirmMessage.value = `当前有 ${annotatedCount} 张图片已标注，AI 标注所有图片将覆盖已有的标注，是否继续？`;
+        confirmResolve = resolve;
+        showConfirmModal.value = true;
+      });
       if (!confirmed) return;
     }
   }
@@ -1189,23 +1209,6 @@ const progressPct = computed(() =>
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-}
-
-/* ---- AI 标注按钮 ---- */
-.ai-btn {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--accent);
-  margin-top: 4px;
-}
-.ai-btn:hover {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* ---- AI 标注弹窗 ---- */
