@@ -44,9 +44,32 @@ export const useProjectStore = defineStore("project", () => {
         fileName: TASKS_FILE,
       });
       tasks.value = data.tasks ?? [];
+      // 修正持久化的错误统计数据
+      await fixStats();
     } catch {
       tasks.value = [];
     }
+  }
+
+  async function fixStats() {
+    let changed = false;
+    for (const task of tasks.value) {
+      if (!task.image_folder) continue;
+      try {
+        const statuses = await invoke<{ path: string; has_annotations: boolean }[]>("get_annotation_statuses", {
+          imageFolder: task.image_folder,
+        });
+        const corrected = statuses.filter(s => s.has_annotations).length;
+        if (corrected !== task.stats.annotated_images) {
+          task.stats.annotated_images = corrected;
+          task.stats.total_images = statuses.length;
+          changed = true;
+        }
+      } catch {
+        // 忽略无法访问的目录
+      }
+    }
+    if (changed) await saveProject();
   }
 
   async function saveProject() {

@@ -781,25 +781,26 @@ fn rectify_crop(img: &image::DynamicImage, pts: &[(u32, u32)], src_stem: &str, i
     let dst_h = h1.max(h2).ceil().max(1.0) as u32;
 
     // 3. 计算透视变换矩阵（DLT 算法）
-    // 源点: pts_f (4x2), 目标点: 标准矩形
-    let dst = [
+    // 目标点: pts_f (text区域), 源点: 标准矩形
+    // OpenCV 的 getPerspectiveTransform(dst, src) 求逆变换: 从矩形→文本区域
+    let src = [
         [0.0, 0.0],
         [dst_w as f64 - 1.0, 0.0],
         [dst_w as f64 - 1.0, dst_h as f64 - 1.0],
         [0.0, dst_h as f64 - 1.0],
     ];
 
-    // 构建 8x8 矩阵和 8x1 向量（Ax = b）
+    // 构建 8x8 矩阵和 8x1 向量（Ax = b）: src → pts_f 的逆映射
     let mut a = [[0.0f64; 8]; 8];
     let mut b = [0.0f64; 8];
     for i in 0..4 {
         let r = i * 2;
+        let u = src[i][0]; let v = src[i][1];
         let x = pts_f[i][0]; let y = pts_f[i][1];
-        let u = dst[i][0]; let v = dst[i][1];
-        a[r] = [x, y, 1.0, 0.0, 0.0, 0.0, -u * x, -u * y];
-        a[r + 1] = [0.0, 0.0, 0.0, x, y, 1.0, -v * x, -v * y];
-        b[r] = u;
-        b[r + 1] = v;
+        a[r] = [u, v, 1.0, 0.0, 0.0, 0.0, -x * u, -x * v];
+        a[r + 1] = [0.0, 0.0, 0.0, u, v, 1.0, -y * u, -y * v];
+        b[r] = x;
+        b[r + 1] = y;
     }
 
     // 高斯消元求解 8 个参数
@@ -830,11 +831,13 @@ fn rectify_crop(img: &image::DynamicImage, pts: &[(u32, u32)], src_stem: &str, i
     let rgba = img.to_rgba8();
     let (src_w, src_h) = (rgba.width(), rgba.height());
     let mut out = image::RgbaImage::new(dst_w, dst_h);
+    let mut mapped = 0u32;
 
     for oy in 0..dst_h {
         for ox in 0..dst_w {
             // 逆映射
             let denom = hm[6] * ox as f64 + hm[7] * oy as f64 + hm[8];
+            if denom.abs() < 1e-10 { continue; }
             let sx = (hm[0] * ox as f64 + hm[1] * oy as f64 + hm[2]) / denom;
             let sy = (hm[3] * ox as f64 + hm[4] * oy as f64 + hm[5]) / denom;
 
@@ -851,9 +854,12 @@ fn rectify_crop(img: &image::DynamicImage, pts: &[(u32, u32)], src_stem: &str, i
                 let g = ((1.0-fx)*(1.0-fy)*p00[1] as f64 + fx*(1.0-fy)*p10[1] as f64 + (1.0-fx)*fy*p01[1] as f64 + fx*fy*p11[1] as f64) as u8;
                 let b = ((1.0-fx)*(1.0-fy)*p00[2] as f64 + fx*(1.0-fy)*p10[2] as f64 + (1.0-fx)*fy*p01[2] as f64 + fx*fy*p11[2] as f64) as u8;
                 out.put_pixel(ox, oy, image::Rgba([r, g, b, 255]));
+                mapped += 1;
             }
         }
     }
+
+    log::info!("[rectify_crop] idx={} mapped={}/{} dst={}x{}", idx, mapped, dst_w * dst_h, dst_w, dst_h);
 
     // 5. 检测竖排文字：高/宽 >= 1.5 时旋转 90 度
     let result = if dst_h as f64 / dst_w as f64 >= 1.5 {
@@ -863,10 +869,12 @@ fn rectify_crop(img: &image::DynamicImage, pts: &[(u32, u32)], src_stem: &str, i
         out
     };
 
-    // 6. 裁剪图片命名 + 保存
+// 6. 裁剪图片命名 + 保存
     let crop_name = format!("{}_{:06}.png", src_stem, idx);
     let crop_path = base.join("rec").join("images").join(&crop_name);
-    let _ = result.save(&crop_path);
+    if let Err(e) = result.save(&crop_path) {
+        log::error!("[rectify_crop] save failed: {} path={}", e, crop_path.display());
+    }
     crop_name
 }
 fn export_paddleocr(images: &[String], classes: &[ExportClassDef], output_dir: &str) -> Result<String, String> {
@@ -972,6 +980,7 @@ fn export_paddleocr(images: &[String], classes: &[ExportClassDef], output_dir: &
         // rec 行 + 裁剪校正
         for (i, e) in split_entries.iter().enumerate() {
             if let Ok(img) = image::ImageReader::open(&e.img_path).map_err(|_| "打开图片失败")?.decode() {
+                log::info!("[write_split] i={} img_path={} dims={}x{}", i, e.img_path, img.width(), img.height());
                 let stem = std::path::Path::new(&e.img_path).file_stem().unwrap_or_default().to_string_lossy();
                 let crop_name = rectify_crop(&img, &e.points, &stem, i, base);
                 rec_lines.push(format!("images/{}\t{}", crop_name, e.transcription.replace('\n', " ")));

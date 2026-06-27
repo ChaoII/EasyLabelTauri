@@ -198,6 +198,7 @@
 import { ref, computed, watch } from "vue";
 import { NButton, NInput, NSelect, NPagination, NDrawer, NDrawerContent, NModal, NButtonGroup, useMessage } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
+import { Plus, FolderOpen } from "lucide-vue-next";
 import { Image as ImageIcon } from "lucide-vue-next";
 import { useProjectStore } from "@/stores/project";
 import { TASK_TYPE_LABELS, TASK_TYPE_ICONS, type TaskType, type Task, type ClassificationMode } from "@/utils/taskTypes";
@@ -243,7 +244,12 @@ async function pickFolder() {
 
 async function handleCreate() {
   if (!canCreate.value) return;
-  await projectStore.createTask(formName.value.trim(), formType.value, formFolder.value, formType.value === 'classification' ? formClassMode.value : undefined);
+  const name = formName.value.trim();
+  if (projectStore.tasks.some(t => t.name === name)) {
+    message.warning(`任务名「${name}」已存在`);
+    return;
+  }
+  await projectStore.createTask(name, formType.value, formFolder.value, formType.value === 'classification' ? formClassMode.value : undefined);
   formName.value = "";
   formFolder.value = "";
   formClassMode.value = "single";
@@ -386,7 +392,7 @@ watch([pageSize, filterText, filterType, filterSort], () => { currentPage.value 
 
 function progressOf(task: Task): number {
   if (task.stats.total_images === 0) return 0;
-  return Math.round((task.stats.annotated_images / task.stats.total_images) * 100);
+  return Math.min(100, Math.round((task.stats.annotated_images / task.stats.total_images) * 100));
 }
 
 function shortPath(p: string): string {

@@ -416,6 +416,13 @@ async function loadTaskImages() {
       folderPath: task.value!.image_folder,
     });
     taskImages.value = result.images;
+    // 清空旧任务的标注状态缓存
+    store.imageAnnotationMap = {};
+    // 同步总图片数到项目统计
+    if (task.value) {
+      task.value.stats.total_images = result.images.length;
+      projectStore.saveProject();
+    }
 
     // 立即显示第一张图（不等待标注状态）
     if (result.images.length > 0) {
@@ -431,6 +438,12 @@ async function loadTaskImages() {
         });
         for (const s of statuses) {
           store.imageAnnotationMap[s.path] = s.has_annotations;
+        }
+        // 同步项目统计
+        const annotated = Object.values(store.imageAnnotationMap).filter(Boolean).length;
+        if (task.value) {
+          task.value.stats.annotated_images = annotated;
+          projectStore.saveProject();
         }
       } catch (e) {
         console.error("批量查询标注状态失败:", e);
