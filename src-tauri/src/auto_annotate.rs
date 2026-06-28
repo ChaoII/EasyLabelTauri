@@ -52,19 +52,25 @@ pub fn auto_detect(
     let mut total_anns = 0usize;
     for img_path in images {
         let img = load_md_image(img_path)?;
+        let (img_w, img_h) = (img.width() as f64, img.height() as f64);
         let results = model.predict(&img).map_err(|e| format!("检测推理失败: {}", e))?;
 
         let mut annotations = Vec::new();
         for det in &results {
             let class_id = det.label_id as usize;
             if class_id >= classes.len() { continue; }
+            // 归一化坐标到 0-1 范围
+            let x1 = det.rect.x as f64 / img_w;
+            let y1 = det.rect.y as f64 / img_h;
+            let x2 = (det.rect.x as f64 + det.rect.width as f64) / img_w;
+            let y2 = (det.rect.y as f64 + det.rect.height as f64) / img_h;
             annotations.push(Annotation::AxisAlignedBox(AxisAlignedBox {
                 id: uuid::Uuid::new_v4().to_string(),
                 class_id,
-                x1: det.rect.x as f64,
-                y1: det.rect.y as f64,
-                x2: (det.rect.x + det.rect.width) as f64,
-                y2: (det.rect.y + det.rect.height) as f64,
+                x1,
+                y1,
+                x2,
+                y2,
                 confidence: det.score as f64,
             }));
         }
@@ -97,6 +103,7 @@ pub fn auto_obb(
     let mut total_anns = 0usize;
     for img_path in images {
         let img = load_md_image(img_path)?;
+        let (img_w, img_h) = (img.width() as f64, img.height() as f64);
         let results = model.predict(&img).map_err(|e| format!("OBB推理失败: {}", e))?;
 
         let mut annotations = Vec::new();
@@ -106,10 +113,10 @@ pub fn auto_obb(
             annotations.push(Annotation::RotatedBox(RotatedBox {
                 id: uuid::Uuid::new_v4().to_string(),
                 class_id,
-                cx: obb.xc as f64,
-                cy: obb.yc as f64,
-                width: obb.width as f64,
-                height: obb.height as f64,
+                cx: obb.xc as f64 / img_w,
+                cy: obb.yc as f64 / img_h,
+                width: obb.width as f64 / img_w,
+                height: obb.height as f64 / img_h,
                 angle: obb.angle as f64,
                 confidence: obb.score as f64,
             }));
@@ -153,14 +160,14 @@ pub fn auto_segmentation(
 
             // 从mask提取多边形轮廓
             let points = if !seg.mask_buffer.is_empty() && seg.mask_shape.len() >= 2 {
-                extract_polygon_from_mask(&seg.mask_buffer, seg.mask_shape[0] as usize, seg.mask_shape[1] as usize, img_w, img_h)
+                extract_polygon_from_mask(&seg.mask_buffer, seg.mask_shape[0] as usize, seg.mask_shape[1] as usize)
             } else {
-                // fallback: 用检测框的四个角点
+                // fallback: 用检测框的四个角点 (归一化)
                 vec![
-                    Point { x: seg.rect.x as f64, y: seg.rect.y as f64 },
-                    Point { x: (seg.rect.x + seg.rect.width) as f64, y: seg.rect.y as f64 },
-                    Point { x: (seg.rect.x + seg.rect.width) as f64, y: (seg.rect.y + seg.rect.height) as f64 },
-                    Point { x: seg.rect.x as f64, y: (seg.rect.y + seg.rect.height) as f64 },
+                    Point { x: seg.rect.x as f64 / img_w, y: seg.rect.y as f64 / img_h },
+                    Point { x: (seg.rect.x + seg.rect.width) as f64 / img_w, y: seg.rect.y as f64 / img_h },
+                    Point { x: (seg.rect.x + seg.rect.width) as f64 / img_w, y: (seg.rect.y + seg.rect.height) as f64 / img_h },
+                    Point { x: seg.rect.x as f64 / img_w, y: (seg.rect.y + seg.rect.height) as f64 / img_h },
                 ]
             };
 
@@ -188,7 +195,7 @@ pub fn auto_segmentation(
 }
 
 /// 从二值mask提取多边形轮廓点 (简化版: 取边界点)
-pub fn extract_polygon_from_mask(mask: &[u8], mask_h: usize, mask_w: usize, img_w: f64, img_h: f64) -> Vec<Point> {
+pub fn extract_polygon_from_mask(mask: &[u8], mask_h: usize, mask_w: usize) -> Vec<Point> {
     let mut points = Vec::new();
     // 采样边界点: 每隔几步取一个点
     let step = (mask_h.max(mask_w) / 32).max(1);
@@ -196,7 +203,7 @@ pub fn extract_polygon_from_mask(mask: &[u8], mask_h: usize, mask_w: usize, img_
     for x in (0..mask_w).step_by(step) {
         for y in 0..mask_h {
             if mask[y * mask_w + x] > 0 {
-                points.push(Point { x: x as f64 / mask_w as f64 * img_w, y: y as f64 / mask_h as f64 * img_h });
+                points.push(Point { x: x as f64 / mask_w as f64, y: y as f64 / mask_h as f64 });
                 break;
             }
         }
@@ -205,13 +212,13 @@ pub fn extract_polygon_from_mask(mask: &[u8], mask_h: usize, mask_w: usize, img_
     for x in (0..mask_w).step_by(step) {
         for y in (0..mask_h).rev() {
             if mask[y * mask_w + x] > 0 {
-                points.push(Point { x: x as f64 / mask_w as f64 * img_w, y: y as f64 / mask_h as f64 * img_h });
+                points.push(Point { x: x as f64 / mask_w as f64, y: y as f64 / mask_h as f64 });
                 break;
             }
         }
     }
     // 去重
-    points.dedup_by(|a, b| (a.x - b.x).abs() < 1.0 && (a.y - b.y).abs() < 1.0);
+    points.dedup_by(|a, b| (a.x - b.x).abs() < 1e-4 && (a.y - b.y).abs() < 1e-4);
     points
 }
 
@@ -229,6 +236,7 @@ pub fn auto_keypoint(
     let mut total_anns = 0usize;
     for img_path in images {
         let img = load_md_image(img_path)?;
+        let (img_w, img_h) = (img.width() as f64, img.height() as f64);
         let results = model.predict(&img).map_err(|e| format!("关键点推理失败: {}", e))?;
 
         let mut annotations = Vec::new();
@@ -238,8 +246,8 @@ pub fn auto_keypoint(
             let keypoints: Vec<Keypoint> = pose.keypoints.iter().enumerate().map(|(i, kp)| {
                 let name = format!("kp_{}", i);
                 Keypoint {
-                    x: kp.x as f64,
-                    y: kp.y as f64,
+                    x: kp.x as f64 / img_w,
+                    y: kp.y as f64 / img_h,
                     visibility: if kp.x > 0.0 && kp.y > 0.0 { Visibility::Visible } else { Visibility::Hidden },
                     name,
                 }
@@ -251,10 +259,10 @@ pub fn auto_keypoint(
                 bounding_box: Some(RotatedBox {
                     id: uuid::Uuid::new_v4().to_string(),
                     class_id,
-                    cx: (pose.rect.x as f64 + pose.rect.width as f64 / 2.0) as f64,
-                    cy: (pose.rect.y as f64 + pose.rect.height as f64 / 2.0) as f64,
-                    width: pose.rect.width as f64,
-                    height: pose.rect.height as f64,
+                    cx: (pose.rect.x as f64 + pose.rect.width as f64 / 2.0) / img_w,
+                    cy: (pose.rect.y as f64 + pose.rect.height as f64 / 2.0) / img_h,
+                    width: pose.rect.width as f64 / img_w,
+                    height: pose.rect.height as f64 / img_h,
                     angle: 0.0,
                     confidence: pose.score as f64,
                 }),
@@ -344,14 +352,15 @@ pub fn auto_ocr(
     let mut total_anns = 0usize;
     for img_path in images {
         let img = load_md_image(img_path)?;
+        let (img_w, img_h) = (img.width() as f64, img.height() as f64);
         let results = ocr_model.predict(&img).map_err(|e| format!("OCR推理失败: {}", e))?;
 
         let mut annotations = Vec::new();
         for ocr in &results {
             // PaddleOCR 返回的points是4个点的多边形
             let points: Vec<Point> = ocr.points.iter().map(|&(px, py)| Point {
-                x: px as f64,
-                y: py as f64,
+                x: px as f64 / img_w,
+                y: py as f64 / img_h,
             }).collect();
 
             if points.len() < 4 { continue; }
