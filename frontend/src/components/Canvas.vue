@@ -906,7 +906,7 @@ function onImageLoad() {
   const rect = el.getBoundingClientRect();
   const zoomX = rect.width / cw.value;
   const zoomY = rect.height / ch.value;
-  const fitZoom = Math.min(zoomX, zoomY) * 0.95; // 留 5% 边距
+  const fitZoom = Math.min(zoomX, zoomY);
   store.setZoom(Math.min(fitZoom, 3)); // 最大缩放 3 倍
   store.setPan(0, 0);
   // 新图已完全渲染，关闭遮罩并记录
@@ -2455,7 +2455,7 @@ function ocrLabelLayout(ann: OcrAnnotation): { x: number; y: number; w: number; 
   position: relative;
   width: 100%;
   height: 100%;
-  background: #141414;
+  background: var(--bg-canvas, #2a2a2a);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -2464,7 +2464,7 @@ function ocrLabelLayout(ann: OcrAnnotation): { x: number; y: number; w: number; 
 }
 
 .canvas-container.has-image {
-  background: #d8d8d8;
+  background: var(--bg-canvas, #2a2a2a);
 }
 
 .canvas-container.is-dragging {
@@ -2721,10 +2721,10 @@ function ocrLabelLayout(ann: OcrAnnotation): { x: number; y: number; w: number; 
 .ocr-text-input {
   width: 100%;
   padding: 8px 12px;
-  background: #1e1e1e;
-  border: 1px solid #3e3e42;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 6px;
-  color: #e4e4e7;
+  color: var(--text-primary);
   font-size: 13px;
   outline: none;
   box-sizing: border-box;

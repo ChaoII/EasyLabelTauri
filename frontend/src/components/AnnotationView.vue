@@ -405,6 +405,22 @@ function onKeyDown(e: KeyboardEvent) {
     return;
   }
 
+  // Ctrl+0 自适应缩放
+  if (e.ctrlKey && key === "0") {
+    e.preventDefault();
+    // 触发画布自适应
+    const container = document.querySelector('.canvas-container') as HTMLElement;
+    if (container && store.imageLoaded) {
+      const rect = container.getBoundingClientRect();
+      const zoomX = rect.width / (store.imageWidth || 1);
+      const zoomY = rect.height / (store.imageHeight || 1);
+      const fitZoom = Math.min(zoomX, zoomY);
+      store.setZoom(Math.min(fitZoom, 3));
+      store.setPan(0, 0);
+    }
+    return;
+  }
+
   // Delete / Backspace 删除选中标注
   if (key === "delete" || key === "backspace") {
     if (store.selectedAnnotationId) {
@@ -441,7 +457,7 @@ const shortcutHint = computed(() => {
   return tools.map(t => {
     const k = Object.entries(toolKeyMap).find(([_, v]) => v === t.name)?.[0];
     return k ? `${t.label}[${k.toUpperCase()}]` : t.label;
-  }).join("  ") + "  ←[←/A]  →[→/D]  删除[Del]  保存[Ctrl+S]";
+  }).join("  ") + "  ←[←/A]  →[→/D]  删除[Del]  保存[Ctrl+S]  自适应[Ctrl+0]";
 });
 
 // ==================== 工具提示 ====================

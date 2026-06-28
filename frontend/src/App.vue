@@ -47,6 +47,7 @@ function applyTheme() {
     document.documentElement.style.setProperty("--bg-panel", "#ffffff");
     document.documentElement.style.setProperty("--bg-elevated", "#e8e8ec");
     document.documentElement.style.setProperty("--bg-hover", "#dddde2");
+    document.documentElement.style.setProperty("--bg-canvas", "#e8e8ec");
     document.documentElement.style.setProperty("--border-subtle", "#d4d4d8");
     document.documentElement.style.setProperty("--text-primary", "#18181b");
     document.documentElement.style.setProperty("--text-secondary", "#52525b");
@@ -59,6 +60,7 @@ function applyTheme() {
     document.documentElement.style.setProperty("--bg-panel", "#252526");
     document.documentElement.style.setProperty("--bg-elevated", "#2d2d30");
     document.documentElement.style.setProperty("--bg-hover", "#37373d");
+    document.documentElement.style.setProperty("--bg-canvas", "#2a2a2a");
     document.documentElement.style.setProperty("--border-subtle", "#3e3e42");
     document.documentElement.style.setProperty("--text-primary", "#e4e4e7");
     document.documentElement.style.setProperty("--text-secondary", "#a1a1aa");
