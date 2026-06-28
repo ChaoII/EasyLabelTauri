@@ -173,6 +173,7 @@
       <span class="hint">{{ toolHint }}</span>
       <span class="shortcut-hint">{{ shortcutHint }}</span>
       <span class="coords">X: {{ store.cursorX }}  Y: {{ store.cursorY }}</span>
+      <span class="zoom-info">🔍 {{ Math.round(store.zoom * 100) }}%</span>
 
       <template v-if="taskImages.length > 1">
         <div class="nav-sep" />
@@ -1102,6 +1103,12 @@ const progressPct = computed(() =>
   margin-right: 12px;
   white-space: nowrap;
   opacity: 0.7;
+}
+.zoom-info {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-right: 8px;
+  white-space: nowrap;
 }
 
 .coords {

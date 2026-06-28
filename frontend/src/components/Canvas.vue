@@ -897,9 +897,18 @@ function rotatedBoxFromEdgeAndPoint(
 
 function onImageLoad() {
   if (!imgRef.value) return;
+  const el = containerRef.value;
+  if (!el) return;
   cw.value = imgRef.value.naturalWidth;
   ch.value = imgRef.value.naturalHeight;
   store.setCanvasSize(cw.value, ch.value);
+  // 自动缩放：让图片完全显示在容器内
+  const rect = el.getBoundingClientRect();
+  const zoomX = rect.width / cw.value;
+  const zoomY = rect.height / ch.value;
+  const fitZoom = Math.min(zoomX, zoomY) * 0.95; // 留 5% 边距
+  store.setZoom(Math.min(fitZoom, 3)); // 最大缩放 3 倍
+  store.setPan(0, 0);
   // 新图已完全渲染，关闭遮罩并记录
   isLoading.value = false;
   lastLoadedPath.value = store.imagePath ?? "";
