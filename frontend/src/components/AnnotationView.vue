@@ -1,29 +1,5 @@
 <template>
   <div class="ann-page">
-    <!-- 统一顶部栏 -->
-    <AppHeader :show-window-controls="false">
-      <template #center>
-        <!-- 返回 + 任务信息 -->
-        <div class="ann-title">
-          <NButton class="back-btn" @click="emit('back')" title="返回任务列表" quaternary circle size="tiny">
-            <template #icon><ChevronLeft :size="16" /></template>
-          </NButton>
-          <div class="task-type-badge" :style="{ background: typeColor + '22', color: typeColor }">
-            {{ TASK_TYPE_ICONS[task?.task_type ?? 'detection'] }}
-          </div>
-          <span class="task-name">{{ task?.name }}</span>
-        </div>
-
-        <!-- 顶栏内进度条 -->
-        <div class="header-progress" v-if="totalCount > 0">
-          <span class="progress-text">{{ annotatedCount }} / {{ totalCount }}</span>
-          <div class="progress-mini">
-            <div class="progress-mini-fill" :class="{ 'fill-done': progressPct >= 100 }" :style="{ width: progressPct + '%' }" />
-          </div>
-        </div>
-      </template>
-    </AppHeader>
-
     <!-- 主体：左侧工具 + 画布 + 右侧面板 -->
     <div class="ann-body">
       <!-- 左侧工具栏 -->
