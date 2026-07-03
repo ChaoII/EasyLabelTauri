@@ -37,10 +37,7 @@ let unlisten: (() => void) | undefined;
 const headerRef = ref<HTMLElement | null>(null);
 
 function toggleTheme() {
-  const modes = ["dark", "light", "system"] as const;
-  const current = settingsStore.settings.theme_mode;
-  const idx = modes.indexOf(current);
-  settingsStore.settings.theme_mode = modes[(idx + 1) % modes.length];
+  settingsStore.settings.theme_mode = settingsStore.settings.theme_mode === 'light' ? 'dark' : 'light';
 }
 
 onMounted(async () => {
