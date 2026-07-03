@@ -12,13 +12,12 @@
       <slot name="center" />
     </div>
 
-    <!-- 右侧：设置 + 窗口控制 -->
+    <!-- 右侧：主题 + 窗口控制 -->
     <div class="header-right">
-      <!-- 设置按钮 -->
-      <button class="win-btn" @click="openSettings" title="设置" aria-label="设置">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
+      <!-- 主题切换 -->
+      <button class="win-btn" @click="toggleTheme" :title="settingsStore.settings.theme_mode === 'light' ? '切换深色' : '切换浅色'" aria-label="切换主题">
+        <svg v-if="settingsStore.settings.theme_mode === 'light'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       </button>
 
       <!-- 最小化 -->
@@ -86,8 +85,11 @@ async function winMinimize() { await getCurrentWindow().minimize(); }
 async function winToggleMaximize() { await getCurrentWindow().toggleMaximize(); }
 async function winClose() { await getCurrentWindow().close(); }
 
-function openSettings() {
-  settingsStore.openModal();
+function toggleTheme() {
+  const modes = ["dark", "light", "system"] as const;
+  const current = settingsStore.settings.theme_mode;
+  const idx = modes.indexOf(current);
+  settingsStore.settings.theme_mode = modes[(idx + 1) % modes.length];
 }
 </script>
 

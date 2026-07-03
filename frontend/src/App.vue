@@ -2,14 +2,17 @@
   <NConfigProvider :theme="naiveTheme" :theme-overrides="themeOverrides" :locale="zhCN">
     <NMessageProvider>
       <div class="app-layout">
-        <NavSidebar />
+        <NavSidebar :current-view="currentView" @navigate="onNavigate" />
         <main class="app-main">
           <AnnotationView
             v-if="projectStore.currentTaskId"
             :task-id="projectStore.currentTaskId"
-            @back="projectStore.closeTask()"
+            @back="onBackFromAnnotation"
           />
-          <HomeView v-else />
+          <HomeView v-else-if="currentView === 'home'" />
+          <div v-else class="workspace-placeholder">
+            <p>标注工作台（任务卡片列表将放在这里）</p>
+          </div>
         </main>
       </div>
     </NMessageProvider>
@@ -18,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, computed, watch } from "vue";
+import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
 import { darkTheme, lightTheme, zhCN } from "naive-ui";
 import { NConfigProvider, NMessageProvider } from "naive-ui";
 import { useProjectStore } from "@/stores/project";
@@ -30,6 +33,20 @@ import NavSidebar from "@/components/NavSidebar.vue";
 
 const projectStore = useProjectStore();
 const settingsStore = useSettingsStore();
+
+const currentView = ref<"home" | "workspace">("home");
+
+function onNavigate(view: "home" | "workspace") {
+  currentView.value = view;
+  if (view === "workspace" && !projectStore.currentTaskId) {
+    // 进入工作台但无打开任务
+  }
+}
+
+function onBackFromAnnotation() {
+  projectStore.closeTask();
+  // 从标注返回后留在工作台
+}
 
 const accent = computed(() => settingsStore.settings.accent_color);
 const themeMode = computed(() => settingsStore.settings.theme_mode);
