@@ -1,12 +1,17 @@
 <template>
   <NConfigProvider :theme="naiveTheme" :theme-overrides="themeOverrides" :locale="zhCN">
     <NMessageProvider>
-      <AnnotationView
-        v-if="projectStore.currentTaskId"
-        :task-id="projectStore.currentTaskId"
-        @back="projectStore.closeTask()"
-      />
-      <HomeView v-else />
+      <div class="app-layout">
+        <NavSidebar />
+        <main class="app-main">
+          <AnnotationView
+            v-if="projectStore.currentTaskId"
+            :task-id="projectStore.currentTaskId"
+            @back="projectStore.closeTask()"
+          />
+          <HomeView v-else />
+        </main>
+      </div>
     </NMessageProvider>
     <SettingsModal />
   </NConfigProvider>
@@ -21,6 +26,7 @@ import { useSettingsStore } from "@/stores/settings";
 import HomeView from "@/components/HomeView.vue";
 import AnnotationView from "@/components/AnnotationView.vue";
 import SettingsModal from "@/components/SettingsModal.vue";
+import NavSidebar from "@/components/NavSidebar.vue";
 
 const projectStore = useProjectStore();
 const settingsStore = useSettingsStore();
@@ -165,3 +171,18 @@ const themeOverrides = computed(() => {
   };
 });
 </script>
+
+<style>
+.app-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+.app-main {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+</style>
