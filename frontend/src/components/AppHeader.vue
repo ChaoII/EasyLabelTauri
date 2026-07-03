@@ -20,27 +20,19 @@
         <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       </button>
 
-      <!-- 最小化 -->
-      <button class="win-btn" @click="winMinimize" title="最小化" aria-label="最小化">
-        <svg width="10" height="10" viewBox="0 0 10 10"><rect y="4" width="10" height="1" fill="currentColor"/></svg>
-      </button>
-      <!-- 最大化 / 还原 -->
-      <button class="win-btn" @click="winToggleMaximize" :title="isMaximized ? '还原' : '最大化'" :aria-label="isMaximized ? '还原' : '最大化'">
-        <svg v-if="!isMaximized" width="10" height="10" viewBox="0 0 10 10">
-          <rect x="0" y="0" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
-        </svg>
-        <svg v-else width="10" height="10" viewBox="0 0 10 10">
-          <rect x="2" y="0" width="8" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
-          <rect x="0" y="2" width="8" height="8" stroke="currentColor" stroke-width="1" fill="var(--bg-panel)"/>
-        </svg>
-      </button>
-      <!-- 关闭 -->
-      <button class="win-btn win-btn--close" @click="winClose" title="关闭" aria-label="关闭">
-        <svg width="10" height="10" viewBox="0 0 10 10">
-          <line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.2"/>
-          <line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.2"/>
-        </svg>
-      </button>
+      <!-- 窗口控制 -->
+      <template v-if="showWindowControls">
+        <button class="win-btn" @click="winMinimize" title="最小化" aria-label="最小化">
+          <svg width="10" height="10" viewBox="0 0 10 10"><rect y="4" width="10" height="1" fill="currentColor"/></svg>
+        </button>
+        <button class="win-btn" @click="winToggleMaximize" :title="isMaximized ? '还原' : '最大化'">
+          <svg v-if="!isMaximized" width="10" height="10" viewBox="0 0 10 10"><rect x="0" y="0" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/></svg>
+          <svg v-else width="10" height="10" viewBox="0 0 10 10"><rect x="2" y="0" width="8" height="8" stroke="currentColor" stroke-width="1" fill="none"/><rect x="0" y="2" width="8" height="8" stroke="currentColor" stroke-width="1" fill="var(--bg-panel)"/></svg>
+        </button>
+        <button class="win-btn win-btn--close" @click="winClose" title="关闭" aria-label="关闭">
+          <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.2"/></svg>
+        </button>
+      </template>
     </div>
   </header>
 </template>
@@ -50,7 +42,7 @@ import { ref, onMounted, onBeforeUnmount } from "vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useSettingsStore } from "@/stores/settings";
 
-const settingsStore = useSettingsStore();
+withDefaults(defineProps<{ showWindowControls?: boolean }>(), { showWindowControls: true });
 
 const isMaximized = ref(false);
 let unlisten: (() => void) | undefined;

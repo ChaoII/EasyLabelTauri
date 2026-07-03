@@ -1,7 +1,7 @@
 <template>
   <div class="ann-page">
     <!-- 统一顶部栏 -->
-    <AppHeader>
+    <AppHeader :show-window-controls="false">
       <template #center>
         <!-- 返回 + 任务信息 -->
         <div class="ann-title">

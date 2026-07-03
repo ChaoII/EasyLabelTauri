@@ -1,10 +1,5 @@
 <template>
   <div class="home">
-    <AppHeader>
-      <template #center>
-      </template>
-    </AppHeader>
-
     <main class="home-content">
       <div v-if="projectStore.tasks.length === 0" class="empty-state">
         <div class="empty-icon">📋</div>
@@ -208,7 +203,6 @@ import { Plus, FolderOpen } from "lucide-vue-next";
 import { Image as ImageIcon } from "lucide-vue-next";
 import { useProjectStore } from "@/stores/project";
 import { TASK_TYPE_LABELS, TASK_TYPE_ICONS, type TaskType, type Task, type ClassificationMode } from "@/utils/taskTypes";
-import AppHeader from "./AppHeader.vue";
 
 const projectStore = useProjectStore();
 const message = useMessage();

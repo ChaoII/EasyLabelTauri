@@ -3,15 +3,23 @@
     <NMessageProvider>
       <div class="app-layout">
         <NavSidebar :current-view="currentView" @navigate="onNavigate" />
-        <main class="app-main">
-          <AnnotationView
-            v-if="projectStore.currentTaskId"
-            :task-id="projectStore.currentTaskId"
-            @back="onBackFromAnnotation"
-          />
-          <HomeDashboard v-else-if="currentView === 'home'" />
-          <HomeView v-else-if="currentView === 'workspace'" />
-        </main>
+        <div class="app-column">
+          <AppHeader>
+            <template #center>
+              <span v-if="currentView === 'home'" style="font-size:14px;font-weight:600;">统计概览</span>
+              <span v-else-if="currentView === 'workspace'" style="font-size:14px;font-weight:600;">标注工作台</span>
+            </template>
+          </AppHeader>
+          <main class="app-main">
+            <AnnotationView
+              v-if="projectStore.currentTaskId"
+              :task-id="projectStore.currentTaskId"
+              @back="onBackFromAnnotation"
+            />
+            <HomeDashboard v-else-if="currentView === 'home'" />
+            <HomeView v-else-if="currentView === 'workspace'" />
+          </main>
+        </div>
       </div>
     </NMessageProvider>
     <SettingsModal />
@@ -29,6 +37,7 @@ import AnnotationView from "@/components/AnnotationView.vue";
 import SettingsModal from "@/components/SettingsModal.vue";
 import NavSidebar from "@/components/NavSidebar.vue";
 import HomeDashboard from "@/components/HomeDashboard.vue";
+import AppHeader from "@/components/AppHeader.vue";
 
 const projectStore = useProjectStore();
 const settingsStore = useSettingsStore();
@@ -193,6 +202,13 @@ const themeOverrides = computed(() => {
   display: flex;
   height: 100vh;
   overflow: hidden;
+}
+.app-column {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .app-main {
   flex: 1;
