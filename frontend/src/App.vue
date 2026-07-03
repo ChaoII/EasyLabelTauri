@@ -9,10 +9,8 @@
             :task-id="projectStore.currentTaskId"
             @back="onBackFromAnnotation"
           />
-          <HomeView v-else-if="currentView === 'home'" />
-          <div v-else class="workspace-placeholder">
-            <p>标注工作台（任务卡片列表将放在这里）</p>
-          </div>
+          <HomeDashboard v-else-if="currentView === 'home'" />
+          <HomeView v-else-if="currentView === 'workspace'" />
         </main>
       </div>
     </NMessageProvider>
@@ -30,6 +28,7 @@ import HomeView from "@/components/HomeView.vue";
 import AnnotationView from "@/components/AnnotationView.vue";
 import SettingsModal from "@/components/SettingsModal.vue";
 import NavSidebar from "@/components/NavSidebar.vue";
+import HomeDashboard from "@/components/HomeDashboard.vue";
 
 const projectStore = useProjectStore();
 const settingsStore = useSettingsStore();
