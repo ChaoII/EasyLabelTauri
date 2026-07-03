@@ -20,7 +20,7 @@
     <!-- 底部 -->
     <div class="nav-bottom">
       <div class="nav-item" @click="openSettings" title="设置">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.15a2 2 0 0 0-2.73 0l-.29.3a2 2 0 0 0-.29 2.73l.18.18a2 2 0 0 1 0 2.73l-.18.18a2 2 0 0 0 0 2.73l.29.3a2 2 0 0 0 2.73 0l.15-.15a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73v.44a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.15a2 2 0 0 0 2.73 0l.29-.3a2 2 0 0 0 0-2.73l-.18-.18a2 2 0 0 1 0-2.73l.18-.18a2 2 0 0 0 0-2.73l-.29-.3a2 2 0 0 0-2.73 0l-.15.15a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73v-.44a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <Settings :size="20" />
       </div>
     </div>
   </aside>
@@ -28,6 +28,7 @@
 
 <script setup lang="ts">
 import { useSettingsStore } from "@/stores/settings";
+import { Settings } from "lucide-vue-next";
 
 defineProps<{ currentView: "home" | "workspace" }>();
 defineEmits<{ (e: "navigate", view: "home" | "workspace"): void }>();
