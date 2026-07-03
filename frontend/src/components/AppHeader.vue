@@ -1,5 +1,9 @@
 <template>
   <header class="app-header" ref="headerRef">
+    <div class="header-left">
+      <div class="logo-badge">E</div>
+      <span class="header-title">EasyLabel</span>
+    </div>
     <div class="header-center">
       <slot name="center" />
     </div>
@@ -73,6 +77,32 @@ async function winClose() { await getCurrentWindow().close(); }
   flex-shrink: 0;
   user-select: none;
   cursor: default;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.logo-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  background: linear-gradient(145deg, #fb923c, var(--accent));
+  color: #0a0a0a;
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: -0.04em;
+  flex-shrink: 0;
+}
+.header-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 .header-center {
   flex: 1;
