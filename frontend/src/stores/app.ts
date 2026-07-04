@@ -148,6 +148,7 @@ export const useAppStore = defineStore("app", () => {
         annotations.value = [];
         statusMessage.value = `已加载: ${result.width} × ${result.height}`;
       }
+      pushHistory();
     } catch (e) {
       statusMessage.value = `错误: ${e}`;
       console.error(e);
@@ -309,8 +310,8 @@ export const useAppStore = defineStore("app", () => {
 
   // ==================== 标注操作 ====================
   function addAnnotation(annotation: Annotation) {
-    pushHistory();
     annotations.value.push(annotation);
+    pushHistory();
     if (imagePath.value) {
       imageAnnotationMap.value[imagePath.value] = true;
     }
@@ -318,8 +319,8 @@ export const useAppStore = defineStore("app", () => {
   }
 
   function removeAnnotation(id: string) {
-    pushHistory();
     annotations.value = annotations.value.filter((a) => a.id !== id);
+    pushHistory();
     if (selectedAnnotationId.value === id) {
       selectedAnnotationId.value = null;
     }
@@ -404,10 +405,10 @@ export const useAppStore = defineStore("app", () => {
   }
 
   function updateAnnotation(id: string, updated: Partial<Annotation>) {
-    pushHistory();
     const idx = annotations.value.findIndex((a) => a.id === id);
     if (idx !== -1) {
       annotations.value[idx] = { ...annotations.value[idx], ...updated } as any;
+      pushHistory();
       saveCurrentAnnotations();
     }
   }
