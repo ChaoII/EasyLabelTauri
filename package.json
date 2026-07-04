@@ -4,6 +4,9 @@
   "scripts": {
     "dev": "cd frontend && npm run dev",
     "build": "cd frontend && npm run build",
+    "test": "cd frontend && npx vitest run",
+    "test:rust": "cd src-tauri && cargo test",
+    "test:all": "cd frontend && npx vitest run && cd ../src-tauri && cargo test",
     "tauri": "node ./frontend/node_modules/@tauri-apps/cli/tauri.js"
   },
   "devDependencies": {
