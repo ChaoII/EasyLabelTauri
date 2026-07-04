@@ -307,3 +307,117 @@ impl Default for AppStateData {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_annotation_get_id() {
+        let box_ann = Annotation::AxisAlignedBox(AxisAlignedBox {
+            id: "box-1".into(), class_id: 0, x1: 0.0, y1: 0.0, x2: 0.5, y2: 0.5, confidence: 1.0, locked: false,
+        });
+        assert_eq!(box_ann.get_id(), "box-1");
+
+        let rot_ann = Annotation::RotatedBox(RotatedBox {
+            id: "rot-1".into(), class_id: 1, cx: 0.5, cy: 0.5, width: 0.4, height: 0.3, angle: 0.5, confidence: 1.0, locked: false,
+        });
+        assert_eq!(rot_ann.get_id(), "rot-1");
+
+        let cls_ann = Annotation::Classification(ClassificationAnnotation {
+            id: "cls-1".into(), class_ids: vec![0], locked: false,
+        });
+        assert_eq!(cls_ann.get_id(), "cls-1");
+    }
+
+    #[test]
+    fn test_annotation_get_class_id() {
+        let box_ann = Annotation::AxisAlignedBox(AxisAlignedBox {
+            id: "b".into(), class_id: 3, x1: 0.0, y1: 0.0, x2: 0.5, y2: 0.5, confidence: 1.0, locked: false,
+        });
+        assert_eq!(box_ann.get_class_id(), 3);
+
+        let cls_ann = Annotation::Classification(ClassificationAnnotation {
+            id: "c".into(), class_ids: vec![], locked: false,
+        });
+        assert_eq!(cls_ann.get_class_id(), 0); // empty -> default 0
+    }
+
+    #[test]
+    fn test_project_add_remove() {
+        let mut proj = Project::new("/img.jpg".into(), 1920, 1080);
+        assert_eq!(proj.annotations.len(), 0);
+
+        let ann = Annotation::AxisAlignedBox(AxisAlignedBox {
+            id: "a1".into(), class_id: 0, x1: 0.0, y1: 0.0, x2: 0.5, y2: 0.5, confidence: 1.0, locked: false,
+        });
+        proj.add_annotation(ann);
+        assert_eq!(proj.annotations.len(), 1);
+
+        proj.remove_annotation("a1");
+        assert_eq!(proj.annotations.len(), 0);
+    }
+
+    #[test]
+    fn test_project_has_default_classes() {
+        let proj = Project::new("/img.jpg".into(), 640, 480);
+        assert_eq!(proj.classes.len(), 5);
+        assert_eq!(proj.classes[0].name, "行人");
+        assert_eq!(proj.classes[1].name, "车辆");
+    }
+
+    #[test]
+    fn test_tool_type_from_str() {
+        assert_eq!(ToolType::from_str("select"), ToolType::Select);
+        assert_eq!(ToolType::from_str("pan"), ToolType::Pan);
+        assert_eq!(ToolType::from_str("rotated_box"), ToolType::RotatedBox);
+        assert_eq!(ToolType::from_str("polygon"), ToolType::Polygon);
+        assert_eq!(ToolType::from_str("keypoint"), ToolType::Keypoint);
+        assert_eq!(ToolType::from_str("ocr"), ToolType::Ocr);
+        assert_eq!(ToolType::from_str("classification"), ToolType::Classification);
+        assert_eq!(ToolType::from_str("unknown"), ToolType::Select); // default
+    }
+
+    #[test]
+    fn test_class_definition_new() {
+        let cls = ClassDefinition::new(5, "test".into(), "#ff0000".into());
+        assert_eq!(cls.id, 5);
+        assert_eq!(cls.name, "test");
+        assert_eq!(cls.color, "#ff0000");
+        assert!(cls.keypoint_names.is_none());
+    }
+
+    #[test]
+    fn test_serde_roundtrip() {
+        let ann = Annotation::AxisAlignedBox(AxisAlignedBox {
+            id: "s1".into(), class_id: 2, x1: 0.1, y1: 0.2, x2: 0.8, y2: 0.9, confidence: 0.95, locked: true,
+        });
+        let json = serde_json::to_string(&ann).unwrap();
+        let deser: Annotation = serde_json::from_str(&json).unwrap();
+        assert_eq!(deser.get_id(), "s1");
+        assert_eq!(deser.get_class_id(), 2);
+        match &deser {
+            Annotation::AxisAlignedBox(b) => {
+                assert!((b.x1 - 0.1).abs() < 1e-6);
+                assert!(b.locked);
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_visibility_variants() {
+        assert_eq!(Visibility::Hidden as i32, 0);
+        assert_eq!(Visibility::Occluded as i32, 1);
+        assert_eq!(Visibility::Visible as i32, 2);
+    }
+
+    #[test]
+    fn test_app_settings_default() {
+        let s = AppSettings::default();
+        assert_eq!(s.theme_mode, "dark");
+        assert_eq!(s.accent_color, "#f97316");
+        assert!(s.show_labels);
+        assert!(!s.dense_mode);
+    }
+}

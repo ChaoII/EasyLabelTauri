@@ -544,3 +544,62 @@ pub struct ExportClassDef {
     pub id: usize,
     pub name: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_iou_perfect_overlap() {
+        let a = AxisAlignedBox {
+            id: "a".into(), class_id: 0,
+            x1: 0.0, y1: 0.0, x2: 1.0, y2: 1.0,
+            confidence: 1.0, locked: false,
+        };
+        let iou_val = iou(&a, 0.0, 0.0, 1.0, 1.0);
+        assert!((iou_val - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_iou_no_overlap() {
+        let a = AxisAlignedBox {
+            id: "a".into(), class_id: 0,
+            x1: 0.0, y1: 0.0, x2: 0.5, y2: 0.5,
+            confidence: 1.0, locked: false,
+        };
+        let iou_val = iou(&a, 0.6, 0.6, 0.3, 0.3);
+        assert!((iou_val - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_iou_partial() {
+        let a = AxisAlignedBox {
+            id: "a".into(), class_id: 0,
+            x1: 0.0, y1: 0.0, x2: 0.6, y2: 0.6,
+            confidence: 1.0, locked: false,
+        };
+        let iou_val = iou(&a, 0.4, 0.4, 0.6, 0.6);
+        // intersection: [0.4,0.4] to [0.6,0.6] = 0.2*0.2 = 0.04
+        // union: 0.36 + 0.36 - 0.04 = 0.68
+        // iou: 0.04/0.68 ≈ 0.0588
+        assert!((iou_val - 0.04 / 0.68).abs() < 1e-4);
+    }
+
+    #[test]
+    fn test_extract_polygon_from_mask_empty() {
+        let mask = vec![0u8; 64 * 64];
+        let points = extract_polygon_from_mask(&mask, 64, 64);
+        assert!(points.is_empty());
+    }
+
+    #[test]
+    fn test_extract_polygon_from_mask_full() {
+        let mask = vec![255u8; 32 * 32];
+        let points = extract_polygon_from_mask(&mask, 32, 32);
+        assert!(!points.is_empty());
+        for p in &points {
+            assert!(p.x >= 0.0 && p.x <= 1.0);
+            assert!(p.y >= 0.0 && p.y <= 1.0);
+        }
+    }
+}

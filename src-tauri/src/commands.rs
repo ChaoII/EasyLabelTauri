@@ -1369,3 +1369,152 @@ pub fn save_settings(settings: AppSettings) -> Result<(), String> {
     log::info!("设置已保存: {}", path.display());
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_image_file() {
+        let p = std::path::Path::new("photo.jpg");
+        assert!(is_image_file(p));
+        let p = std::path::Path::new("photo.JPEG");
+        assert!(is_image_file(p));
+        let p = std::path::Path::new("doc.pdf");
+        assert!(!is_image_file(p));
+        let p = std::path::Path::new("photo");
+        assert!(!is_image_file(p));
+    }
+
+    #[test]
+    fn test_create_box_clamps_coordinates() {
+        let ann = create_box(0, 0.8, 0.3, 0.2, 0.6);
+        match ann {
+            Annotation::AxisAlignedBox(b) => {
+                assert!((b.x1 - 0.2).abs() < 1e-6);
+                assert!((b.y1 - 0.3).abs() < 1e-6);
+                assert!((b.x2 - 0.8).abs() < 1e-6);
+                assert!((b.y2 - 0.6).abs() < 1e-6);
+                assert_eq!(b.class_id, 0);
+            }
+            _ => panic!("expected AxisAlignedBox"),
+        }
+    }
+
+    #[test]
+    fn test_create_rotated_box_center_from_corners() {
+        let ann = create_rotated_box(2, 0.1, 0.2, 0.9, 0.8, 0.5);
+        match ann {
+            Annotation::RotatedBox(rb) => {
+                assert!((rb.cx - 0.5).abs() < 1e-6);
+                assert!((rb.cy - 0.5).abs() < 1e-6);
+                assert!((rb.width - 0.8).abs() < 1e-6);
+                assert!((rb.height - 0.6).abs() < 1e-6);
+                assert!((rb.angle - 0.5).abs() < 1e-6);
+                assert_eq!(rb.class_id, 2);
+            }
+            _ => panic!("expected RotatedBox"),
+        }
+    }
+
+    #[test]
+    fn test_create_polygon_requires_three_points() {
+        let result = create_polygon(1, vec![
+            Point { x: 0.1, y: 0.1 },
+            Point { x: 0.3, y: 0.1 },
+        ]);
+        assert!(result.is_none());
+
+        let result = create_polygon(1, vec![
+            Point { x: 0.1, y: 0.1 },
+            Point { x: 0.3, y: 0.1 },
+            Point { x: 0.2, y: 0.3 },
+        ]);
+        assert!(result.is_some());
+        match result.unwrap() {
+            Annotation::Polygon(p) => {
+                assert_eq!(p.points.len(), 3);
+                assert_eq!(p.class_id, 1);
+            }
+            _ => panic!("expected Polygon"),
+        }
+    }
+
+    #[test]
+    fn test_create_ocr() {
+        let ann = create_ocr(0, vec![
+            Point { x: 0.0, y: 0.0 },
+            Point { x: 0.5, y: 0.0 },
+            Point { x: 0.5, y: 0.2 },
+            Point { x: 0.0, y: 0.2 },
+        ], "Hello".into());
+        match ann {
+            Annotation::Ocr(o) => {
+                assert_eq!(o.text, "Hello");
+                assert_eq!(o.points.len(), 4);
+            }
+            _ => panic!("expected Ocr"),
+        }
+    }
+
+    #[test]
+    fn test_export_axis_aligned_box_format() {
+        let b = AxisAlignedBox {
+            id: "".into(), class_id: 0, x1: 0.1, y1: 0.2, x2: 0.8, y2: 0.9, confidence: 1.0, locked: false,
+        };
+        let result = export_axis_aligned_box(&b);
+        // format: class_id x1 y1 x2 y2
+        let parts: Vec<&str> = result.split(' ').collect();
+        assert_eq!(parts.len(), 5);
+        assert_eq!(parts[0], "0");
+        assert!((parts[1].parse::<f64>().unwrap() - 0.1).abs() < 0.001);
+        assert!((parts[2].parse::<f64>().unwrap() - 0.2).abs() < 0.001);
+        assert!((parts[3].parse::<f64>().unwrap() - 0.8).abs() < 0.001);
+        assert!((parts[4].parse::<f64>().unwrap() - 0.9).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_export_rotated_box_format() {
+        let rb = RotatedBox {
+            id: "".into(), class_id: 1, cx: 0.5, cy: 0.5, width: 0.4, height: 0.3,
+            angle: 0.25, confidence: 1.0, locked: false,
+        };
+        let result = export_rotated_box(&rb);
+        // format: class_id cx cy w h angle
+        let parts: Vec<&str> = result.split(' ').collect();
+        assert_eq!(parts.len(), 6);
+        assert_eq!(parts[0], "1");
+        assert!((parts[1].parse::<f64>().unwrap() - 0.5).abs() < 0.001);
+        assert!((parts[2].parse::<f64>().unwrap() - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_class_name_by_id() {
+        let classes = vec![
+            ExportClassDef { id: 0, name: "cat".into() },
+            ExportClassDef { id: 1, name: "dog".into() },
+        ];
+        assert_eq!(class_name_by_id(&classes, 0), "cat");
+        assert_eq!(class_name_by_id(&classes, 1), "dog");
+        assert_eq!(class_name_by_id(&classes, 99), "class_99");
+    }
+
+    #[test]
+    fn test_create_keypoint_with_bbox() {
+        let kps = vec![
+            Keypoint { x: 0.3, y: 0.4, visibility: Visibility::Visible, name: "eye".into() },
+        ];
+        let ann = create_keypoint_with_bbox(0, kps, 0.2, 0.3, 0.8, 0.7);
+        match ann {
+            Annotation::Keypoint(k) => {
+                assert_eq!(k.class_id, 0);
+                assert_eq!(k.keypoints.len(), 1);
+                assert!(k.bounding_box.is_some());
+                let bb = k.bounding_box.unwrap();
+                assert!((bb.cx - 0.5).abs() < 1e-6);
+                assert!((bb.cy - 0.5).abs() < 1e-6);
+            }
+            _ => panic!("expected Keypoint"),
+        }
+    }
+}
