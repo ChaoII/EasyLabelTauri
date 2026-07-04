@@ -1,17 +1,25 @@
 <template>
   <div class="ann-page">
-    <!-- 面包屑导航 -->
-    <div class="ann-breadcrumb">
-      <NBreadcrumb>
-        <NBreadcrumbItem>
-          <span class="crumb-link" @click="$emit('back')">标注工作台</span>
-        </NBreadcrumbItem>
-        <NBreadcrumbItem>{{ task?.name ?? '标注' }}</NBreadcrumbItem>
-      </NBreadcrumb>
-      <NButton size="tiny" quaternary @click="$emit('back')">
-        <template #icon><LogOut :size="14" /></template>
-        退出
-      </NButton>
+    <!-- 顶部信息栏 -->
+    <div class="ann-topbar">
+      <div class="topbar-left">
+        <div class="task-type-badge" :style="{ background: typeColor + '22', color: typeColor }">
+          {{ TASK_TYPE_ICONS[task?.task_type ?? 'detection'] }}
+        </div>
+        <span class="topbar-task-name">{{ task?.name ?? '标注' }}</span>
+        <span class="topbar-sep" />
+        <span class="crumb-link" @click="$emit('back')">返回工作台</span>
+      </div>
+      <div class="topbar-right" v-if="taskStatsTotal > 0">
+        <div class="topbar-progress-bar">
+          <div class="progress-fill" :style="{ width: taskStatsProgress + '%' }" />
+        </div>
+        <span class="topbar-progress-text">{{ taskStatsAnnotated }} / {{ taskStatsTotal }}</span>
+        <NButton size="tiny" quaternary @click="$emit('back')">
+          <template #icon><LogOut :size="14" /></template>
+          退出
+        </NButton>
+      </div>
     </div>
     <!-- 主体：左侧工具 + 画布 + 右侧面板 -->
     <div class="ann-body">
@@ -341,7 +349,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
-import { NBadge, NModal, NSelect, NInput, NButton, NButtonGroup, NTooltip, NVirtualList, NBreadcrumb, NBreadcrumbItem, useMessage } from "naive-ui";
+import { NBadge, NModal, NSelect, NInput, NButton, NButtonGroup, NTooltip, NVirtualList, useMessage } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
 import {
   MousePointer2, Square, Pentagon, CircleDot, Type,
@@ -372,6 +380,18 @@ const message = useMessage();
 const modelStore = useModelStore();
 
 const task = computed(() => projectStore.tasks.find((t) => t.id === props.taskId));
+
+const typeColorMap: Record<string, string> = {
+  classification: "#6366f1", detection: "#3b82f6", rotated_detection: "#8b5cf6",
+  keypoint: "#eab308", segmentation: "#22c55e", ocr: "#06b6d4",
+};
+const typeColor = computed(() => typeColorMap[task.value?.task_type ?? ""] ?? "#6b7280");
+const taskStatsTotal = computed(() => task.value?.stats?.total_images ?? 0);
+const taskStatsAnnotated = computed(() => task.value?.stats?.annotated_images ?? 0);
+const taskStatsProgress = computed(() =>
+  taskStatsTotal.value === 0 ? 0 : Math.round(taskStatsAnnotated.value / taskStatsTotal.value * 100)
+);
+
 const classificationMode = computed(() => task.value?.config?.classification_mode ?? "multi");
 const taskImages = ref<ImageInfo[]>([]);
 const currentImageIndex = ref(0);
@@ -410,14 +430,6 @@ const clsTools = [
 ];
 
 const taskTools = computed(() => taskToolMap[task.value?.task_type ?? "detection"] ?? []);
-
-const typeColor = computed(() => {
-  const m: Record<TaskType, string> = {
-    classification: "#6366f1", detection: "#3b82f6", rotated_detection: "#8b5cf6",
-    keypoint: "#eab308", segmentation: "#22c55e", ocr: "#06b6d4",
-  };
-  return m[task.value?.task_type ?? "detection"] ?? "#6b7280";
-});
 
 // ==================== 快捷键 ====================
 const toolKeyMap: Record<string, ToolName> = {
@@ -1472,21 +1484,74 @@ const progressPct = computed(() =>
   gap: 8px;
 }
 
-/* ---- 面包屑导航 ---- */
-.ann-breadcrumb {
+/* ---- 顶部信息栏 ---- */
+.ann-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 12px;
+  padding: 6px 14px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  gap: 12px;
 }
-.ann-breadcrumb .crumb-link {
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.task-type-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.topbar-task-name {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-primary);
+}
+.topbar-sep {
+  width: 1px; height: 18px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+}
+.crumb-link {
+  font-size: 13px;
   cursor: pointer;
   color: var(--accent);
+  white-space: nowrap;
 }
-.ann-breadcrumb .crumb-link:hover {
-  text-decoration: underline;
+.crumb-link:hover { text-decoration: underline; }
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.topbar-progress-bar {
+  width: 120px; height: 6px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+.topbar-progress-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 </style>

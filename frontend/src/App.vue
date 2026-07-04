@@ -4,24 +4,7 @@
       <div class="app-layout">
         <AppHeader>
           <template #center>
-            <template v-if="projectStore.currentTask">
-              <div class="ann-title">
-                <NButton class="back-btn" @click="onBackFromAnnotation" title="返回任务列表" quaternary circle size="tiny">
-                  <template #icon><ChevronLeft :size="16" /></template>
-                </NButton>
-                <div class="task-type-badge" :style="{ background: typeColor() + '22', color: typeColor() }">
-                  {{ TASK_TYPE_ICONS[projectStore.currentTask.task_type] }}
-                </div>
-                <span class="task-name">{{ projectStore.currentTask.name }}</span>
-              </div>
-              <div class="header-progress" v-if="currentTaskTotal > 0">
-                <span class="progress-text">{{ currentTaskAnnotated }} / {{ currentTaskTotal }}</span>
-                <div class="progress-mini">
-                  <div class="progress-mini-fill" :class="{ 'fill-done': progressPct >= 100 }" :style="{ width: progressPct + '%' }" />
-                </div>
-              </div>
-            </template>
-            <span v-else-if="currentView === 'home'" style="font-size:14px;font-weight:600;">统计概览</span>
+            <span v-if="currentView === 'home'" style="font-size:14px;font-weight:600;">统计概览</span>
             <span v-else-if="currentView === 'workspace'" style="font-size:14px;font-weight:600;">标注工作台</span>
             <span v-else-if="currentView === 'models'" style="font-size:14px;font-weight:600;">模型管理</span>
           </template>
@@ -59,9 +42,6 @@ import NavSidebar from "@/components/NavSidebar.vue";
 import HomeDashboard from "@/components/HomeDashboard.vue";
 import ModelManage from "@/components/ModelManage.vue";
 import AppHeader from "@/components/AppHeader.vue";
-import { ChevronLeft } from "lucide-vue-next";
-import { TASK_TYPE_ICONS, type TaskType } from "@/utils/taskTypes";
-import { NButton } from "naive-ui";
 
 const projectStore = useProjectStore();
 const settingsStore = useSettingsStore();
@@ -69,22 +49,8 @@ const modelStore = useModelStore();
 
 const currentView = ref<"home" | "workspace" | "models">("home");
 
-function typeColor(): string {
-  const m: Record<string, string> = {
-    classification: "#6366f1", detection: "#3b82f6", rotated_detection: "#8b5cf6",
-    keypoint: "#eab308", segmentation: "#22c55e", ocr: "#06b6d4",
-  };
-  return m[projectStore.currentTask?.task_type ?? ""] ?? "#6b7280";
-}
-const currentTaskTotal = computed(() => projectStore.currentTask?.stats?.total_images ?? 0);
-const currentTaskAnnotated = computed(() => projectStore.currentTask?.stats?.annotated_images ?? 0);
-const progressPct = computed(() =>
-  currentTaskTotal.value === 0 ? 0 : Math.round(currentTaskAnnotated.value / currentTaskTotal.value * 100)
-);
-
 function onNavigate(view: "home" | "workspace" | "models") {
   currentView.value = view;
-  // 切换页面时关闭当前打开的任务，确保能正常退出标注视图
   if (projectStore.currentTaskId) {
     projectStore.closeTask();
   }
@@ -92,7 +58,6 @@ function onNavigate(view: "home" | "workspace" | "models") {
 
 function onBackFromAnnotation() {
   projectStore.closeTask();
-  // 从标注返回后留在工作台
 }
 
 const accent = computed(() => settingsStore.settings.accent_color);
