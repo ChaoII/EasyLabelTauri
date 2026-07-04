@@ -276,6 +276,10 @@
             </NButtonGroup>
           </div>
         </div>
+        <div class="field">
+          <label class="field-label">已保存模型</label>
+          <NSelect v-model:value="selectedModelId" :options="modelOptions" size="small" placeholder="选择已配置的模型..." clearable @update:value="onModelSelected" />
+        </div>
         <div v-if="task?.task_type === 'ocr'" class="field">
           <label class="field-label">检测模型 ONNX</label>
           <div class="dir-row">
@@ -339,6 +343,7 @@ import {
 import { useAppStore } from "@/stores/app";
 import { useProjectStore } from "@/stores/project";
 import { useSettingsStore } from "@/stores/settings";
+import { useModelStore } from "@/stores/models";
 import { TASK_TYPE_ICONS, type TaskType } from "@/utils/taskTypes";
 import ToolButton from "./ToolButton.vue";
 import Canvas from "./Canvas.vue";
@@ -356,6 +361,7 @@ const store = useAppStore();
 const projectStore = useProjectStore();
 const settingsStore = useSettingsStore();
 const message = useMessage();
+const modelStore = useModelStore();
 
 const task = computed(() => projectStore.tasks.find((t) => t.id === props.taskId));
 const classificationMode = computed(() => task.value?.config?.classification_mode ?? "multi");
@@ -540,6 +546,12 @@ const ocrDetModelPath = ref("");
 const ocrRecModelPath = ref("");
 const ocrClsModelPath = ref("");
 const ocrDictPath = ref("");
+const selectedModelId = ref<string | null>(null);
+const modelOptions = computed(() =>
+  modelStore.models
+    .filter(m => m.task_type === task.value?.task_type)
+    .map(m => ({ label: m.name + (m.runtime === 'gpu' ? ' [GPU]' : ' [CPU]'), value: m.id }))
+);
 const showConfirmModal = ref(false);
 const confirmMessage = ref("");
 const showBatchClassModal = ref(false);
@@ -552,9 +564,24 @@ function openAiAnnotate() {
   ocrRecModelPath.value = "";
   ocrClsModelPath.value = "";
   ocrDictPath.value = "";
+  selectedModelId.value = null;
   aiAnnotateMode.value = "current";
   aiAnnotateProgress.value = { current: 0, total: 0, message: "" };
   showAiAnnotateModal.value = true;
+}
+
+function onModelSelected(id: string | null) {
+  if (!id) return;
+  const m = modelStore.models.find(x => x.id === id);
+  if (!m) return;
+  if (m.task_type === "ocr") {
+    ocrDetModelPath.value = m.ocr_det || "";
+    ocrRecModelPath.value = m.ocr_rec || "";
+    ocrClsModelPath.value = m.ocr_cls || "";
+    ocrDictPath.value = m.ocr_dict || "";
+  } else {
+    aiModelPath.value = m.model_path;
+  }
 }
 
 async function pickAiModelFile(type: string) {
