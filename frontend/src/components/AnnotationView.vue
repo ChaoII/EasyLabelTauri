@@ -1,5 +1,18 @@
 <template>
   <div class="ann-page">
+    <!-- 面包屑导航 -->
+    <div class="ann-breadcrumb">
+      <NBreadcrumb>
+        <NBreadcrumbItem>
+          <span class="crumb-link" @click="$emit('back')">标注工作台</span>
+        </NBreadcrumbItem>
+        <NBreadcrumbItem>{{ task?.name ?? '标注' }}</NBreadcrumbItem>
+      </NBreadcrumb>
+      <NButton size="tiny" quaternary @click="$emit('back')">
+        <template #icon><LogOut :size="14" /></template>
+        退出
+      </NButton>
+    </div>
     <!-- 主体：左侧工具 + 画布 + 右侧面板 -->
     <div class="ann-body">
       <!-- 左侧工具栏 -->
@@ -328,12 +341,12 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
-import { NBadge, NModal, NSelect, NInput, NButton, NButtonGroup, NTooltip, NVirtualList, useMessage } from "naive-ui";
+import { NBadge, NModal, NSelect, NInput, NButton, NButtonGroup, NTooltip, NVirtualList, NBreadcrumb, NBreadcrumbItem, useMessage } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
 import {
   MousePointer2, Square, Pentagon, CircleDot, Type,
   Hand, ZoomIn, ChevronLeft, ChevronRight, RefreshCw,
-  AlignLeft, Diamond, Plus,
+  AlignLeft, Diamond, Plus, LogOut,
 } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
 import { useProjectStore } from "@/stores/project";
@@ -1457,5 +1470,23 @@ const progressPct = computed(() =>
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* ---- 面包屑导航 ---- */
+.ann-breadcrumb {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.ann-breadcrumb .crumb-link {
+  cursor: pointer;
+  color: var(--accent);
+}
+.ann-breadcrumb .crumb-link:hover {
+  text-decoration: underline;
 }
 </style>

@@ -84,8 +84,9 @@ const progressPct = computed(() =>
 
 function onNavigate(view: "home" | "workspace" | "models") {
   currentView.value = view;
-  if (view === "workspace" && !projectStore.currentTaskId) {
-    // 进入工作台但无打开任务
+  // 切换页面时关闭当前打开的任务，确保能正常退出标注视图
+  if (projectStore.currentTaskId) {
+    projectStore.closeTask();
   }
 }
 
