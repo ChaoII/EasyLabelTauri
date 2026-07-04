@@ -405,6 +405,132 @@ pub fn save_annotations_for_image_internal(image_path: &str, annotations: &[Anno
     Ok(())
 }
 
+/// 评估结果
+#[derive(serde::Serialize)]
+pub struct EvalMetrics {
+    pub total_images: usize,
+    pub total_gt: usize,
+    pub total_pred: usize,
+    pub true_positives: usize,
+    pub false_positives: usize,
+    pub false_negatives: usize,
+    pub precision: f64,
+    pub recall: f64,
+    pub f1: f64,
+    pub per_image: Vec<EvalImageResult>,
+}
+
+#[derive(serde::Serialize)]
+pub struct EvalImageResult {
+    pub image_name: String,
+    pub gt_count: usize,
+    pub pred_count: usize,
+    pub tp: usize,
+    pub fp: usize,
+    pub fn_count: usize,
+}
+
+fn iou(a: &AxisAlignedBox, bx: f64, by: f64, bw: f64, bh: f64) -> f64 {
+    let ax1 = a.x1; let ay1 = a.y1; let ax2 = a.x2; let ay2 = a.y2;
+    let bx1 = bx; let by1 = by; let bx2 = bx + bw; let by2 = by + bh;
+    let ix1 = ax1.max(bx1); let iy1 = ay1.max(by1);
+    let ix2 = ax2.min(bx2); let iy2 = ay2.min(by2);
+    let iw = (ix2 - ix1).max(0.0); let ih = (iy2 - iy1).max(0.0);
+    let inter = iw * ih;
+    let union = (ax2 - ax1) * (ay2 - ay1) + bw * bh - inter;
+    if union <= 0.0 { 0.0 } else { inter / union }
+}
+
+/// 模型评估: 在标注数据上运行推理并对比
+pub fn evaluate_detection(
+    images: &[String],
+    model_path: &str,
+    classes: &[ExportClassDef],
+) -> Result<EvalMetrics, String> {
+    let opt = default_runtime();
+    let model = modeldeploy::vision::detection::UltralyticsDet::new(model_path, &opt)
+        .map_err(|e| format!("加载检测模型失败: {}", e))?;
+
+    let mut total_gt = 0usize;
+    let mut total_pred = 0usize;
+    let mut total_tp = 0usize;
+    let mut total_fp = 0usize;
+    let mut total_fn = 0usize;
+    let mut per_image = Vec::new();
+
+    for img_path in images {
+        let p = std::path::Path::new(img_path);
+        let image_name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+
+        // 加载真实标注
+        let ann_path = annotations_path_for_image(img_path);
+        let gt_annotations: Vec<AxisAlignedBox> = if ann_path.exists() {
+            std::fs::read_to_string(&ann_path).ok()
+                .and_then(|c| serde_json::from_str::<Vec<Annotation>>(&c).ok())
+                .map(|anns| anns.into_iter().filter_map(|a| {
+                    if let Annotation::AxisAlignedBox(b) = a { Some(b) } else { None }
+                }).collect())
+                .unwrap_or_default()
+        } else { continue; };
+
+        if gt_annotations.is_empty() { continue; }
+
+        // 运行推理
+        let img = load_md_image(img_path)?;
+        let (img_w, img_h) = (img.width() as f64, img.height() as f64);
+        let results = match model.predict(&img) {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+
+        let predictions: Vec<(f64, f64, f64, f64)> = results.iter().map(|det| {
+            (det.rect.x as f64 / img_w, det.rect.y as f64 / img_h,
+             det.rect.width as f64 / img_w, det.rect.height as f64 / img_h)
+        }).collect();
+
+        // 计算 TP/FP/FN
+        let mut gt_matched = vec![false; gt_annotations.len()];
+        let mut pred_matched = vec![false; predictions.len()];
+
+        for (gi, gt) in gt_annotations.iter().enumerate() {
+            for (pi, pred) in predictions.iter().enumerate() {
+                if iou(gt, pred.0, pred.1, pred.2, pred.3) > 0.5 {
+                    gt_matched[gi] = true;
+                    pred_matched[pi] = true;
+                }
+            }
+        }
+
+        let tp = gt_matched.iter().filter(|&&m| m).count();
+        let fp = pred_matched.iter().filter(|&&m| !m).count();
+        let fn_count = gt_matched.iter().filter(|&&m| !m).count();
+
+        total_gt += gt_annotations.len();
+        total_pred += predictions.len();
+        total_tp += tp;
+        total_fp += fp;
+        total_fn += fn_count;
+
+        per_image.push(EvalImageResult {
+            image_name,
+            gt_count: gt_annotations.len(),
+            pred_count: predictions.len(),
+            tp, fp, fn_count,
+        });
+    }
+
+    let precision = if total_tp + total_fp > 0 { total_tp as f64 / (total_tp + total_fp) as f64 } else { 0.0 };
+    let recall = if total_tp + total_fn > 0 { total_tp as f64 / (total_tp + total_fn) as f64 } else { 0.0 };
+    let f1 = if precision + recall > 0.0 { 2.0 * precision * recall / (precision + recall) } else { 0.0 };
+
+    Ok(EvalMetrics {
+        total_images: per_image.len(),
+        total_gt, total_pred, true_positives: total_tp,
+        false_positives: total_fp, false_negatives: total_fn,
+        precision, recall, f1, per_image,
+    })
+}
+
 /// 标注文件路径
 pub fn annotations_path_for_image(image_path: &str) -> std::path::PathBuf {
     let p = Path::new(image_path);

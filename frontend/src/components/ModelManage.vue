@@ -14,6 +14,7 @@
         <div class="model-top">
           <span class="model-type-badge" :style="{ background: typeColor(m.task_type) + '22', color: typeColor(m.task_type) }">{{ TASK_TYPE_LABELS[m.task_type as TaskType] || m.task_type }}</span>
           <span class="model-runtime" :class="m.runtime">{{ m.runtime === 'gpu' ? 'GPU' : 'CPU' }}</span>
+          <NButton size="tiny" quaternary @click="openEval(m)" title="在标注数据上评估模型">评估</NButton>
           <NButton quaternary circle size="tiny" @click="modelStore.removeModel(m.id)" title="删除">
             <template #icon><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></template>
           </NButton>
@@ -66,16 +67,109 @@
         </div>
       </template>
     </NModal>
+
+    <!-- 评估结果弹窗 -->
+    <NModal v-model:show="showEvalModal" preset="card" title="模型评估" :mask-closable="true" style="width: 520px">
+      <div class="modal-body-export">
+        <div class="field">
+          <label class="field-label">选择评估任务</label>
+          <NSelect v-model:value="evalTaskFolder" :options="evalTaskOptions" size="small" placeholder="选择有标注数据的任务" :disabled="evalLoading" />
+        </div>
+        <div v-if="evalLoading" class="export-progress">
+          <div class="progress-bar-outer"><div class="progress-bar-inner" style="width:100%" /></div>
+          <span class="progress-text">正在评估，请稍候...</span>
+        </div>
+        <div v-else-if="evalResult">
+          <div class="eval-summary">
+            <div class="eval-stat">
+              <div class="eval-value">{{ (evalResult.precision * 100).toFixed(1) }}%</div>
+              <div class="eval-label">精确率</div>
+            </div>
+            <div class="eval-stat">
+              <div class="eval-value">{{ (evalResult.recall * 100).toFixed(1) }}%</div>
+              <div class="eval-label">召回率</div>
+            </div>
+            <div class="eval-stat">
+              <div class="eval-value">{{ (evalResult.f1 * 100).toFixed(1) }}%</div>
+              <div class="eval-label">F1 分数</div>
+            </div>
+          </div>
+          <div class="eval-detail">
+            <div class="eval-detail-row"><span>总标注 (GT)</span><span>{{ evalResult.total_gt }}</span></div>
+            <div class="eval-detail-row"><span>总预测</span><span>{{ evalResult.total_pred }}</span></div>
+            <div class="eval-detail-row"><span>正确 (TP)</span><span class="val-good">{{ evalResult.true_positives }}</span></div>
+            <div class="eval-detail-row"><span>误检 (FP)</span><span class="val-bad">{{ evalResult.false_positives }}</span></div>
+            <div class="eval-detail-row"><span>漏检 (FN)</span><span class="val-bad">{{ evalResult.false_negatives }}</span></div>
+          </div>
+          <div class="eval-per-image">
+            <div class="eval-per-image-title">每张图片详情</div>
+            <div v-for="img in evalResult.per_image" :key="img.image_name" class="eval-img-row">
+              <span class="eval-img-name">{{ img.image_name }}</span>
+              <span>GT:{{ img.gt_count }} 预测:{{ img.pred_count }} TP:{{ img.tp }} FP:{{ img.fp }} FN:{{ img.fn_count }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="drawer-footer">
+          <NButton size="small" @click="showEvalModal = false" :disabled="evalLoading">关闭</NButton>
+          <NButton v-if="!evalResult && !evalLoading" size="small" type="primary" @click="startEvaluate" :disabled="!evalTaskFolder">开始评估</NButton>
+        </div>
+      </template>
+    </NModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { NButton, NInput, NSelect, NModal, NButtonGroup } from "naive-ui";
+import { NButton, NInput, NSelect, NModal, NButtonGroup, useMessage } from "naive-ui";
+import { invoke } from "@tauri-apps/api/core";
 import { useModelStore, type ModelConfig } from "@/stores/models";
+import { useProjectStore } from "@/stores/project";
 import { TASK_TYPE_LABELS, TASK_TYPE_ICONS, type TaskType } from "@/utils/taskTypes";
 
 const modelStore = useModelStore();
+const message = useMessage();
+const projectStore = useProjectStore();
+
+const showEvalModal = ref(false);
+const evalLoading = ref(false);
+const evalResult = ref<any>(null);
+const evalTarget = ref<ModelConfig | null>(null);
+const evalTaskFolder = ref("");
+
+const evalTaskOptions = computed(() =>
+  projectStore.tasks.map(t => ({ label: `${t.name} (${TASK_TYPE_LABELS[t.task_type]})`, value: t.image_folder }))
+);
+
+async function openEval(m: ModelConfig) {
+  evalTarget.value = m;
+  evalResult.value = null;
+  evalLoading.value = false;
+  evalTaskFolder.value = "";
+  showEvalModal.value = true;
+}
+
+async function startEvaluate() {
+  if (!evalTarget.value || !evalTaskFolder.value) return;
+  evalLoading.value = true;
+  evalResult.value = null;
+  try {
+    const result = await invoke<any>("evaluate_model", {
+      request: {
+        image_folder: evalTaskFolder.value,
+        model_path: evalTarget.value.model_path,
+        classes: [],
+      },
+    });
+    evalResult.value = result;
+  } catch (e) {
+    message.error(`评估失败: ${e instanceof Error ? e.message : String(e)}`);
+    showEvalModal.value = false;
+  } finally {
+    evalLoading.value = false;
+  }
+}
 
 const TASK_TYPES_OPTIONS = [
   { label: "目标检测", value: "detection" },

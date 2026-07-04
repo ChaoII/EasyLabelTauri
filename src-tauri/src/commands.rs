@@ -580,6 +580,26 @@ pub async fn auto_annotate(request: crate::auto_annotate::AutoAnnotateRequest, a
     Ok(result)
 }
 
+// ==================== 模型评估 ====================
+
+#[derive(serde::Deserialize)]
+pub struct EvalRequest {
+    pub image_folder: String,
+    pub model_path: String,
+    pub classes: Vec<crate::auto_annotate::ExportClassDef>,
+}
+
+#[tauri::command]
+pub async fn evaluate_model(request: EvalRequest) -> Result<crate::auto_annotate::EvalMetrics, String> {
+    let images = get_image_files(&request.image_folder)?;
+    if images.is_empty() {
+        return Err("没有找到图片文件".to_string());
+    }
+    tokio::task::spawn_blocking(move || {
+        crate::auto_annotate::evaluate_detection(&images, &request.model_path, &request.classes)
+    }).await.map_err(|e| format!("评估线程错误: {}", e))?.map_err(|e| e)
+}
+
 // ==================== 标注导入 ====================
 
 #[derive(serde::Serialize, serde::Deserialize)]
