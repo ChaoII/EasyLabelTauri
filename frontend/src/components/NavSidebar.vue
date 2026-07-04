@@ -1,12 +1,5 @@
 <template>
   <aside class="nav-sidebar">
-    <!-- Logo -->
-    <div class="nav-logo-area">
-      <div class="nav-logo-icon" title="EasyLabel">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-      </div>
-    </div>
-
     <!-- 导航项目 -->
     <div class="nav-items">
       <div class="nav-item" :class="{ active: currentView === 'home' }" @click="$emit('navigate', 'home')" title="首页">
@@ -53,32 +46,6 @@ function openSettings() {
   flex-shrink: 0;
   z-index: 10;
   overflow: hidden;
-}
-
-.nav-logo-area {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  padding: 14px 0 18px;
-  border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 12px;
-}
-
-.nav-logo-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  transition: all 0.15s;
-}
-
-.nav-logo-icon:hover {
-  transform: scale(1.05);
 }
 
 .nav-items {
