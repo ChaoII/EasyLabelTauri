@@ -2,31 +2,31 @@
   <NConfigProvider :theme="naiveTheme" :theme-overrides="themeOverrides" :locale="zhCN">
     <NMessageProvider>
       <div class="app-layout">
-        <NavSidebar :current-view="currentView" @navigate="onNavigate" />
-        <div class="app-column">
-          <AppHeader>
-            <template #center>
-              <template v-if="projectStore.currentTask">
-                <div class="ann-title">
-                  <NButton class="back-btn" @click="onBackFromAnnotation" title="返回任务列表" quaternary circle size="tiny">
-                    <template #icon><ChevronLeft :size="16" /></template>
-                  </NButton>
-                  <div class="task-type-badge" :style="{ background: typeColor() + '22', color: typeColor() }">
-                    {{ TASK_TYPE_ICONS[projectStore.currentTask.task_type] }}
-                  </div>
-                  <span class="task-name">{{ projectStore.currentTask.name }}</span>
+        <AppHeader>
+          <template #center>
+            <template v-if="projectStore.currentTask">
+              <div class="ann-title">
+                <NButton class="back-btn" @click="onBackFromAnnotation" title="返回任务列表" quaternary circle size="tiny">
+                  <template #icon><ChevronLeft :size="16" /></template>
+                </NButton>
+                <div class="task-type-badge" :style="{ background: typeColor() + '22', color: typeColor() }">
+                  {{ TASK_TYPE_ICONS[projectStore.currentTask.task_type] }}
                 </div>
-                <div class="header-progress" v-if="currentTaskTotal > 0">
-                  <span class="progress-text">{{ currentTaskAnnotated }} / {{ currentTaskTotal }}</span>
-                  <div class="progress-mini">
-                    <div class="progress-mini-fill" :class="{ 'fill-done': progressPct >= 100 }" :style="{ width: progressPct + '%' }" />
-                  </div>
+                <span class="task-name">{{ projectStore.currentTask.name }}</span>
+              </div>
+              <div class="header-progress" v-if="currentTaskTotal > 0">
+                <span class="progress-text">{{ currentTaskAnnotated }} / {{ currentTaskTotal }}</span>
+                <div class="progress-mini">
+                  <div class="progress-mini-fill" :class="{ 'fill-done': progressPct >= 100 }" :style="{ width: progressPct + '%' }" />
                 </div>
-              </template>
-              <span v-else-if="currentView === 'home'" style="font-size:14px;font-weight:600;">统计概览</span>
-              <span v-else-if="currentView === 'workspace'" style="font-size:14px;font-weight:600;">标注工作台</span>
+              </div>
             </template>
-          </AppHeader>
+            <span v-else-if="currentView === 'home'" style="font-size:14px;font-weight:600;">统计概览</span>
+            <span v-else-if="currentView === 'workspace'" style="font-size:14px;font-weight:600;">标注工作台</span>
+          </template>
+        </AppHeader>
+        <div class="app-body">
+          <NavSidebar :current-view="currentView" @navigate="onNavigate" />
           <main class="app-main">
             <AnnotationView
               v-if="projectStore.currentTaskId"
@@ -233,15 +233,15 @@ const themeOverrides = computed(() => {
 <style>
 .app-layout {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   overflow: hidden;
 }
-.app-column {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
+.app-body {
   display: flex;
-  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 .app-main {
   flex: 1;
