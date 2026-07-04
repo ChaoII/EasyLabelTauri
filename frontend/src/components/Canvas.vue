@@ -613,24 +613,23 @@
 
     </svg>
     <!-- OCR 文本输入弹窗 -->
-    <div v-if="ocrTextInputVisible" class="ocr-text-overlay" @click.self="ocrTextInputVisible = false">
-      <div class="ocr-text-modal">
-        <div class="ocr-text-title">输入 OCR 文本</div>
-        <NInput
-          ref="ocrInputRef"
-          v-model:value="ocrTextInput"
-          placeholder="请输入识别到的文本内容..."
-          size="small"
-          :maxlength="200"
-          @keydown.enter="confirmOcrText"
-          @keydown.escape="ocrTextInputVisible = false"
-        />
-        <div class="ocr-text-actions">
+    <NModal v-model:show="ocrTextInputVisible" preset="card" title="输入 OCR 文本" style="width:400px" :mask-closable="true" @update:show="(v: boolean) => { if (!v) ocrTextInputVisible = false }">
+      <NInput
+        ref="ocrInputRef"
+        v-model:value="ocrTextInput"
+        placeholder="请输入识别到的文本内容..."
+        size="small"
+        :maxlength="200"
+        @keydown.enter="confirmOcrText"
+        @keydown.escape="ocrTextInputVisible = false"
+      />
+      <template #footer>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
           <NButton size="small" quaternary @click="ocrTextInputVisible = false">取消</NButton>
           <NButton size="small" type="primary" @click="confirmOcrText">确认</NButton>
         </div>
-      </div>
-    </div>
+      </template>
+    </NModal>
     <div v-if="!store.imageLoaded" class="empty-state">
       <div
         class="drop-zone"
@@ -2688,64 +2687,6 @@ function ocrLabelLayout(ann: OcrAnnotation): { x: number; y: number; w: number; 
 
 .handle-poly-vertex {
   cursor: default;
-}
-
-/* OCR 文本输入弹窗 */
-.ocr-text-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.ocr-text-modal {
-  background: #252526;
-  border: 1px solid #3e3e42;
-  border-radius: 8px;
-  padding: 20px 24px;
-  min-width: 320px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}
-
-.ocr-text-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #e4e4e7;
-  margin-bottom: 12px;
-}
-
-.ocr-text-input {
-  width: 100%;
-  padding: 8px 12px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-size: 13px;
-  outline: none;
-  box-sizing: border-box;
-  margin-bottom: 12px;
-  transition: border-color 0.15s;
-}
-
-.ocr-text-input:focus {
-  border-color: #f97316;
-}
-
-.ocr-text-input::placeholder {
-  color: #71717a;
-}
-
-.ocr-text-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
 }
 
 .ocr-btn {

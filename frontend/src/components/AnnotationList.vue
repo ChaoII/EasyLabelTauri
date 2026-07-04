@@ -2,7 +2,7 @@
   <NEmpty v-if="filteredAnnotations.length === 0" description="暂无标注" size="small" />
   <template v-else>
     <div class="search-bar">
-      <input v-model="searchText" class="search-input" placeholder="搜索标注..." />
+      <NInput v-model:value="searchText" placeholder="搜索标注..." size="tiny" clearable />
     </div>
     <div class="annotation-list">
       <div
@@ -59,7 +59,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
-import { NButton, NEmpty } from "naive-ui";
+import { NButton, NEmpty, NInput } from "naive-ui";
 import { Diamond, Square, X } from "lucide-vue-next";
 import type { Annotation, ClassDefinition, KeypointAnnotation } from "@/utils/types";
 
@@ -243,19 +243,6 @@ function keypointCountInfo(ann: Annotation): string {
 
 .search-bar {
   padding: 4px 0;
-}
-.search-input {
-  width: 100%;
-  padding: 4px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  font-size: 11px;
-  outline: none;
-}
-.search-input:focus {
-  border-color: var(--accent);
 }
 .lock-btn {
   opacity: 0.5;

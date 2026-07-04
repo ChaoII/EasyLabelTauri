@@ -119,12 +119,13 @@
           <div class="panel-section">
             <div class="section-title-row">
               <span class="section-title">图片列表</span>
-              <span v-if="taskImages.length > 0" class="count-chip">{{ taskImages.length }}</span>
+              <NTag v-if="taskImages.length > 0" size="small" :bordered="false" round>{{ taskImages.length }}</NTag>
               <NButton quaternary circle size="tiny" title="重新加载目录" @click="reloadFolder">
                 <template #icon><RefreshCw :size="13" /></template>
               </NButton>
             </div>
-            <div class="image-list" v-if="taskImages.length > 0">
+            <NScrollbar v-if="taskImages.length > 0" style="flex:1;min-height:0">
+            <div class="image-list">
             <NVirtualList :items="taskImages" :item-size="34" style="height:100%">
               <template #default="{ item, index }">
                 <div class="image-item" :class="{ active: index === currentImageIndex }" @click="goToImage(index)">
@@ -134,10 +135,11 @@
               </template>
             </NVirtualList>
           </div>
-            <div v-else class="panel-empty">暂无图片</div>
+            </NScrollbar>
+            <NEmpty v-else description="暂无图片" size="small" />
           </div>
 
-          <div class="panel-divider" />
+          <NDivider style="margin:0" />
 
           <!-- 标签类别 -->
           <div class="panel-section">
@@ -147,7 +149,7 @@
                 <template #icon><Plus :size="13" /></template>
               </NButton>
             </div>
-            <div class="section-scroll">
+            <NScrollbar class="section-scroll">
               <ClassList
                 :classes="task?.classes ?? []"
                 :selected-class-id="selectedClassId"
@@ -159,10 +161,10 @@
                 @toggle="(id) => classificationMode === 'single' ? store.setClassification(id) : store.toggleClassification(id)"
                 @edit="(cls) => classModalRef?.openAsEdit(cls)"
               />
-            </div>
+            </NScrollbar>
           </div>
 
-          <div class="panel-divider" />
+          <NDivider style="margin:0" />
 
           <!-- 标注列表 -->
           <div class="panel-section">
@@ -170,7 +172,7 @@
               <span class="section-title">标注列表</span>
               <NBadge :value="store.annotationCount" :max="999" type="warning" />
             </div>
-            <div class="section-scroll">
+            <NScrollbar class="section-scroll">
               <AnnotationList
                 :annotations="store.annotations"
                 :selected-id="store.selectedAnnotationId"
@@ -187,7 +189,7 @@
                 <NButton size="tiny" quaternary @click="showBatchClassModal = true">改类</NButton>
                 <NButton size="tiny" quaternary @click="store.clearBatchSelect()">取消</NButton>
               </div>
-            </div>
+            </NScrollbar>
           </div>
 
         </div>
@@ -326,9 +328,7 @@
           </div>
         </div>
         <div v-if="aiAnnotating" class="export-progress">
-          <div class="progress-bar-outer">
-            <div class="progress-bar-inner" :style="{ width: (aiAnnotateProgress.total > 0 ? aiAnnotateProgress.current / aiAnnotateProgress.total * 100 : 0) + '%' }" />
-          </div>
+          <NProgress :value="aiAnnotateProgress.total > 0 ? aiAnnotateProgress.current / aiAnnotateProgress.total * 100 : 0" :height="6" :border-radius="3" :fill-border-radius="3" :indicator-placement="'inside'" />
           <span class="progress-text">{{ aiAnnotateProgress.message }} {{ aiAnnotateProgress.total > 0 ? aiAnnotateProgress.current + '/' + aiAnnotateProgress.total : '' }}</span>
         </div>
       </div>
@@ -349,7 +349,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
-import { NBadge, NModal, NSelect, NInput, NButton, NButtonGroup, NTooltip, NVirtualList, useMessage } from "naive-ui";
+import { NBadge, NModal, NSelect, NInput, NButton, NButtonGroup, NTooltip, NVirtualList, NScrollbar, NProgress, NTag, NEmpty, NDivider, useMessage } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
 import {
   MousePointer2, Square, Pentagon, CircleDot, Type,
@@ -1080,12 +1080,6 @@ const progressPct = computed(() =>
   min-height: 0;
 }
 
-.section-scroll {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
-
 .panel-section {
   display: flex;
   flex-direction: column;
@@ -1111,39 +1105,8 @@ const progressPct = computed(() =>
   flex: 1;
 }
 
-.count-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  padding: 0 6px;
-  min-height: 18px;
-  border-radius: 999px;
-  font-variant-numeric: tabular-nums;
-}
-
-.panel-divider {
-  height: 1px;
-  background: var(--border-subtle);
-  margin: 4px 0;
-}
-
-.panel-empty {
-  font-size: 11px;
-  color: var(--text-dim);
-  padding: 8px 0;
-  text-align: center;
-}
-
 /* ---- 图片列表 ---- */
 .image-list {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -1386,18 +1349,6 @@ const progressPct = computed(() =>
   gap: 6px;
   margin-top: 4px;
 }
-.progress-bar-outer {
-  height: 6px;
-  background: var(--bg-elevated);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.progress-bar-inner {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
 .progress-text {
   font-size: 11px;
   color: var(--text-secondary);
@@ -1461,19 +1412,6 @@ const progressPct = computed(() =>
   line-height: 1.25;
   color: var(--text-dim);
   text-align: center;
-}
-
-/* ---- 模式切换 ---- */
-.mode-switch {
-  display: flex;
-}
-.dir-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.dir-row .n-input {
-  flex: 1;
 }
 
 /* ---- 弹窗底部按钮 ---- */

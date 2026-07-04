@@ -26,12 +26,12 @@
             <div class="card-top">
               <h3 class="card-title">{{ task.name }}</h3>
               <div class="card-badges">
-                <span class="card-type-badge" :style="{ color: typeColor(task.task_type), background: typeColor(task.task_type) + '18' }">
+                <NTag :bordered="false" size="small" :style="{ color: typeColor(task.task_type), background: typeColor(task.task_type) + '18' }">
                   {{ TASK_TYPE_ICONS[task.task_type] }} {{ TASK_TYPE_LABELS[task.task_type] }}
-                </span>
-                <span v-if="task.task_type === 'classification'" class="card-mode-tag" :class="task.config?.classification_mode ?? 'multi'">
+                </NTag>
+                <NTag v-if="task.task_type === 'classification'" :bordered="false" size="small" :type="task.config?.classification_mode === 'single' ? 'info' : 'warning'">
                   {{ task.config?.classification_mode === 'single' ? '单标签' : '多标签' }}
-                </span>
+                </NTag>
               </div>
             </div>
 
@@ -61,34 +61,42 @@
                 <span>标注进度</span>
                 <span class="progress-numbers">{{ task.stats.annotated_images }} / {{ task.stats.total_images }} · {{ progressOf(task) }}%</span>
               </div>
-              <div class="progress-bar-bg">
-                <div class="progress-bar-fill" :style="{ width: progressOf(task) + '%' }" :class="{ 'card-bar-done': progressOf(task) >= 100 }" />
-              </div>
+              <NProgress :value="progressOf(task)" :height="6" :border-radius="3" :fill-border-radius="3" />
             </div>
             </div>
 
             <!-- 底部操作栏 -->
             <div class="card-footer" @click.stop>
-              <button class="footer-btn" title="编辑" @click="openTask(task.id)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                <span>编辑</span>
-              </button>
-              <button class="footer-btn" title="导出" @click="openExport(task)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>导出</span>
-              </button>
-              <button class="footer-btn" title="验证数据" @click="openValidate(task)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                <span>验证</span>
-              </button>
-              <button class="footer-btn" title="导入标注" @click="openImport(task)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="12 3 12 15"/><polyline points="7 10 12 15 17 10"/></svg>
-                <span>导入</span>
-              </button>
-              <button class="footer-btn btn-danger" title="删除" @click="confirmDelete(task)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                <span>删除</span>
-              </button>
+              <NButton quaternary size="tiny" @click="openTask(task.id)">
+                <template #icon>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </template>
+                编辑
+              </NButton>
+              <NButton quaternary size="tiny" @click="openExport(task)">
+                <template #icon>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </template>
+                导出
+              </NButton>
+              <NButton quaternary size="tiny" @click="openValidate(task)">
+                <template #icon>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                </template>
+                验证
+              </NButton>
+              <NButton quaternary size="tiny" @click="openImport(task)">
+                <template #icon>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="12 3 12 15"/><polyline points="7 10 12 15 17 10"/></svg>
+                </template>
+                导入
+              </NButton>
+              <NButton quaternary size="tiny" type="error" @click="confirmDelete(task)">
+                <template #icon>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                </template>
+                删除
+              </NButton>
             </div>
           </div>
         </div>
@@ -256,7 +264,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { NButton, NInput, NSelect, NPagination, NDrawer, NDrawerContent, NModal, NButtonGroup, useMessage } from "naive-ui";
+import { NButton, NInput, NSelect, NPagination, NDrawer, NDrawerContent, NModal, NButtonGroup, NTooltip, NProgress, NTag, useMessage } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
 import { Plus, FolderOpen } from "lucide-vue-next";
 import { Image as ImageIcon } from "lucide-vue-next";
@@ -654,31 +662,6 @@ function formatTime(iso: string): string {
   gap: 6px;
   flex-shrink: 0;
 }
-.card-type-badge {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 6px;
-  line-height: 1.3;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.card-mode-tag {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 4px;
-  line-height: 1.3;
-  white-space: nowrap;
-}
-.card-mode-tag.single {
-  background: #22c55e18;
-  color: #22c55e;
-}
-.card-mode-tag.multi {
-  background: #3b82f618;
-  color: #3b82f6;
-}
 .card-info {
   display: flex;
   flex-direction: column;
@@ -730,50 +713,11 @@ function formatTime(iso: string): string {
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
-.progress-bar-bg {
-  height: 5px;
-  background: var(--bg-elevated);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.progress-bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  background: var(--accent);
-  transition: width 0.4s ease;
-}
-.progress-bar-fill.card-bar-done {
-  background: var(--success);
-}
 .card-footer {
   display: flex;
   gap: 0;
   border-top: 1px solid var(--border-subtle);
   margin-top: 0;
-}
-.footer-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 7px 0;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-.footer-btn + .footer-btn {
-  border-left: 1px solid var(--border-subtle);
-}
-.footer-btn:hover {
-  background: var(--bg-hover);
-  color: var(--accent);
-}
-.footer-btn.btn-danger:hover {
-  color: var(--danger);
 }
 
 .fab {
@@ -943,23 +887,6 @@ function formatTime(iso: string): string {
   border-radius: 6px;
   overflow: hidden;
   align-self: flex-start;
-}
-.mode-btn {
-  padding: 6px 20px;
-  font-size: 12px;
-  font-weight: 600;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-.mode-btn.active {
-  background: var(--accent);
-  color: #fff;
-}
-.mode-btn:not(.active):hover {
-  background: var(--bg-hover);
 }
 
 .type-icon {
