@@ -45,6 +45,7 @@ fn main() {
             get_annotation_statuses,
             auto_annotate,
             import_annotations,
+            validate_annotations,
         ])
         .run(tauri::generate_context!())
         .expect("启动失败");

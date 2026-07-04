@@ -77,6 +77,10 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 <span>导出</span>
               </button>
+              <button class="footer-btn" title="验证数据" @click="openValidate(task)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <span>验证</span>
+              </button>
               <button class="footer-btn" title="导入标注" @click="openImport(task)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="12 3 12 15"/><polyline points="7 10 12 15 17 10"/></svg>
                 <span>导入</span>
@@ -216,6 +220,37 @@
         </div>
       </template>
     </NModal>
+
+    <!-- 验证结果弹窗 -->
+    <NModal v-model:show="showValidateModal" preset="card" title="数据验证" :mask-closable="true" style="width: 520px">
+      <div class="modal-body-export">
+        <div v-if="validating" class="export-progress">
+          <div class="progress-bar-outer"><div class="progress-bar-inner" style="width:100%" /></div>
+          <span class="progress-text">正在验证...</span>
+        </div>
+        <div v-else-if="validateReport">
+          <div class="field">
+            <label class="field-label">验证结果</label>
+            <div class="export-task-name">{{ validateReport.summary }}</div>
+          </div>
+          <div class="field">
+            <label class="field-label">详情</label>
+            <div class="validation-list">
+              <div v-for="(issue, i) in validateReport.issues" :key="i" class="validation-item" :class="'type-' + issue.issue_type">
+                <span class="val-type">{{ issue.issue_type }}</span>
+                <span class="val-desc">{{ issue.description }}</span>
+              </div>
+              <div v-if="validateReport.issues.length === 0" class="validation-ok">✅ 未发现问题</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="drawer-footer">
+          <NButton size="small" @click="showValidateModal = false">关闭</NButton>
+        </div>
+      </template>
+    </NModal>
   </div>
 </template>
 
@@ -295,6 +330,24 @@ async function handleDelete() {
   deleteTarget.value = null;
 }
 
+const showValidateModal = ref(false);
+const validating = ref(false);
+const validateReport = ref<any>(null);
+
+async function openValidate(task: Task) {
+  showValidateModal.value = true;
+  validating.value = true;
+  validateReport.value = null;
+  try {
+    const report = await invoke<any>("validate_annotations", { imageFolder: task.image_folder });
+    validateReport.value = report;
+  } catch (e) {
+    message.error(`验证失败: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    validating.value = false;
+  }
+}
+
 // ==================== 导出 ====================
 const EXPORT_FORMATS: Record<string, { value: string; label: string }[]> = {
   detection: [{ value: "yolo", label: "YOLO (.txt)" }],
@@ -354,6 +407,12 @@ async function handleExport() {
       },
     });
     message.success(`导出成功: ${outputPath}`);
+    await projectStore.addExportHistory({
+      taskName: t.name,
+      format: exportFormat.value,
+      time: new Date().toLocaleString("zh-CN"),
+      path: outputPath,
+    });
     showExportModal.value = false;
   } catch (e) {
     message.error(`导出失败: ${e instanceof Error ? e.message : String(e)}`);

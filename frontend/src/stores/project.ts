@@ -35,6 +35,7 @@ export const useProjectStore = defineStore("project", () => {
   const filterText = ref("");
   const filterType = ref("");
   const filterSort = ref("newest");
+  const exportHistory = ref<{ taskName: string; format: string; time: string; path: string }[]>([]);
 
   // ==================== 持久化 ====================
 
@@ -46,6 +47,10 @@ export const useProjectStore = defineStore("project", () => {
       tasks.value = data.tasks ?? [];
       // 修正持久化的错误统计数据
       await fixStats();
+      const exportHistoryData = await invoke("load_project_list", { fileName: "export_history.json" }).catch(() => null);
+      if (exportHistoryData?.exports) {
+        exportHistory.value = exportHistoryData.exports;
+      }
     } catch {
       tasks.value = [];
     }
@@ -81,6 +86,12 @@ export const useProjectStore = defineStore("project", () => {
     } catch (e) {
       console.error("保存任务列表失败:", e);
     }
+  }
+
+  async function addExportHistory(entry: { taskName: string; format: string; time: string; path: string }) {
+    exportHistory.value.unshift(entry);
+    if (exportHistory.value.length > 50) exportHistory.value = exportHistory.value.slice(0, 50);
+    await invoke("save_project_list", { fileName: "export_history.json", data: { exports: exportHistory.value } });
   }
 
   // ==================== 任务 CRUD ====================
@@ -202,8 +213,10 @@ export const useProjectStore = defineStore("project", () => {
     filterText,
     filterType,
     filterSort,
+    exportHistory,
     loadProject,
     saveProject,
+    addExportHistory,
     createTask,
     deleteTask,
     updateTaskStats,

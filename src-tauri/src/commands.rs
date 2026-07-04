@@ -674,6 +674,93 @@ pub fn import_annotations(request: ImportRequest) -> Result<String, String> {
     Ok(format!("导入完成，共处理 {} 张图片", total))
 }
 
+#[derive(serde::Serialize)]
+pub struct ValidationIssue {
+    pub image_name: String,
+    pub issue_type: String,
+    pub description: String,
+}
+
+#[derive(serde::Serialize)]
+pub struct ValidationReport {
+    pub total_images: usize,
+    pub total_annotations: usize,
+    pub issues: Vec<ValidationIssue>,
+    pub summary: String,
+}
+
+#[tauri::command]
+pub fn validate_annotations(image_folder: String) -> Result<ValidationReport, String> {
+    let images = get_image_files(&image_folder)?;
+    let mut issues = Vec::new();
+    let mut total_anns = 0usize;
+
+    for img_path in &images {
+        let p = std::path::Path::new(img_path);
+        let file_name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let ann_path = annotations_path_for_image(img_path);
+
+        if !ann_path.exists() {
+            issues.push(ValidationIssue {
+                image_name: file_name.clone(),
+                issue_type: "empty".to_string(),
+                description: "没有标注文件".to_string(),
+            });
+            continue;
+        }
+
+        let content = match std::fs::read_to_string(&ann_path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        if content.trim().is_empty() || content.trim() == "[]" {
+            issues.push(ValidationIssue {
+                image_name: file_name.clone(),
+                issue_type: "empty".to_string(),
+                description: "标注文件为空".to_string(),
+            });
+            continue;
+        }
+
+        let annotations: Vec<Annotation> = match serde_json::from_str(&content) {
+            Ok(a) => a,
+            Err(_) => {
+                issues.push(ValidationIssue {
+                    image_name: file_name.clone(),
+                    issue_type: "parse_error".to_string(),
+                    description: "标注文件格式错误".to_string(),
+                });
+                continue;
+            }
+        };
+
+        total_anns += annotations.len();
+
+        for ann in &annotations {
+            match ann {
+                Annotation::AxisAlignedBox(b) => {
+                    if b.x1 < 0.0 || b.y1 < 0.0 || b.x2 > 1.0 || b.y2 > 1.0 || b.x1 >= b.x2 || b.y1 >= b.y2 {
+                        issues.push(ValidationIssue {
+                            image_name: file_name.clone(),
+                            issue_type: "out_of_bounds".to_string(),
+                            description: format!("检测框坐标异常: [{:.4},{:.4},{:.4},{:.4}]", b.x1, b.y1, b.x2, b.y2),
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    let summary = format!("共 {} 张图片，{} 个标注，发现 {} 个问题", images.len(), total_anns, issues.len());
+    Ok(ValidationReport {
+        total_images: images.len(),
+        total_annotations: total_anns,
+        issues,
+        summary,
+    })
+}
+
 // ==================== 标注导出 ====================
 
 #[derive(serde::Serialize, serde::Deserialize)]
