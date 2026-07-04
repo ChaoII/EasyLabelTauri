@@ -153,6 +153,9 @@ onMounted(async () => {
   await projectStore.loadProject();
   await settingsStore.load();
   await modelStore.load();
+  // 加载保存的语言设置
+  const { loadLocale } = await import("./composables/useLocale");
+  loadLocale();
   applyTheme();
   applyDense(settingsStore.settings.dense_mode);
   // 监听系统主题变化

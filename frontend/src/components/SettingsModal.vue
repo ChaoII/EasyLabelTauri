@@ -85,6 +85,11 @@
           <label class="field-label">紧凑模式</label>
           <NSwitch v-model:value="settingsStore.settings.dense_mode" size="small" />
         </div>
+
+        <div class="field-row">
+          <label class="field-label">语言</label>
+          <NSelect v-model:value="currentLocale" :options="localeOptions" size="small" style="width:120px" @update:value="onLocaleChange" />
+        </div>
       </div>
     </div>
 
@@ -100,10 +105,25 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { NModal, NSwitch, NButton, NButtonGroup } from "naive-ui";
+import { useI18n } from "vue-i18n";
+import { NModal, NSwitch, NButton, NButtonGroup, NSelect } from "naive-ui";
 import { useSettingsStore } from "@/stores/settings";
 
 const settingsStore = useSettingsStore();
+const { locale } = useI18n();
+
+const currentLocale = computed(() => locale.value);
+const localeOptions = [
+  { label: "中文", value: "zh-CN" },
+  { label: "English", value: "en-US" },
+];
+
+function onLocaleChange(val: string) {
+  if (val === "zh-CN" || val === "en-US") {
+    locale.value = val;
+    localStorage.setItem("easy-label-locale", val);
+  }
+}
 
 const visible = computed({
   get: () => settingsStore.showModal,

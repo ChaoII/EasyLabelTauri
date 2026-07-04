@@ -103,21 +103,16 @@
                 <template #icon><RefreshCw :size="13" /></template>
               </NButton>
             </div>
-            <div class="image-list" ref="imageListRef" @scroll="onImageListScroll" v-if="taskImages.length > 0">
-              <div
-                v-for="(img, idx) in taskImages"
-                :key="img.path"
-                class="image-item"
-                :class="{ active: idx === currentImageIndex }"
-                @click="goToImage(idx)"
-              >
-                <span
-                  class="ann-dot"
-                  :class="(store.imageAnnotationMap[img.path] ?? false) ? 'dot-done' : 'dot-pending'"
-                />
-                <span class="img-name">{{ img.name }}</span>
-              </div>
-            </div>
+            <div class="image-list" v-if="taskImages.length > 0">
+            <NVirtualList :items="taskImages" :item-size="34" style="height:100%">
+              <template #default="{ item, index }">
+                <div class="image-item" :class="{ active: index === currentImageIndex }" @click="goToImage(index)">
+                  <span class="ann-dot" :class="(store.imageAnnotationMap[item.path] ?? false) ? 'dot-done' : 'dot-pending'" />
+                  <span class="img-name">{{ item.name }}</span>
+                </div>
+              </template>
+            </NVirtualList>
+          </div>
             <div v-else class="panel-empty">暂无图片</div>
           </div>
 
@@ -333,7 +328,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
-import { NBadge, NModal, NSelect, NInput, NButton, NButtonGroup, NTooltip, useMessage } from "naive-ui";
+import { NBadge, NModal, NSelect, NInput, NButton, NButtonGroup, NTooltip, NVirtualList, useMessage } from "naive-ui";
 import { invoke } from "@tauri-apps/api/core";
 import {
   MousePointer2, Square, Pentagon, CircleDot, Type,
