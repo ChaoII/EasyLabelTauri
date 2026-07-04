@@ -23,6 +23,7 @@
             </template>
             <span v-else-if="currentView === 'home'" style="font-size:14px;font-weight:600;">统计概览</span>
             <span v-else-if="currentView === 'workspace'" style="font-size:14px;font-weight:600;">标注工作台</span>
+            <span v-else-if="currentView === 'models'" style="font-size:14px;font-weight:600;">模型管理</span>
           </template>
         </AppHeader>
         <div class="app-body">
@@ -34,6 +35,7 @@
               @back="onBackFromAnnotation"
             />
             <HomeDashboard v-else-if="currentView === 'home'" />
+            <ModelManage v-else-if="currentView === 'models'" />
             <HomeView v-else-if="currentView === 'workspace'" />
           </main>
         </div>
@@ -49,11 +51,13 @@ import { darkTheme, lightTheme, zhCN } from "naive-ui";
 import { NConfigProvider, NMessageProvider } from "naive-ui";
 import { useProjectStore } from "@/stores/project";
 import { useSettingsStore } from "@/stores/settings";
+import { useModelStore } from "@/stores/models";
 import HomeView from "@/components/HomeView.vue";
 import AnnotationView from "@/components/AnnotationView.vue";
 import SettingsModal from "@/components/SettingsModal.vue";
 import NavSidebar from "@/components/NavSidebar.vue";
 import HomeDashboard from "@/components/HomeDashboard.vue";
+import ModelManage from "@/components/ModelManage.vue";
 import AppHeader from "@/components/AppHeader.vue";
 import { ChevronLeft } from "lucide-vue-next";
 import { TASK_TYPE_ICONS, type TaskType } from "@/utils/taskTypes";
@@ -61,8 +65,9 @@ import { NButton } from "naive-ui";
 
 const projectStore = useProjectStore();
 const settingsStore = useSettingsStore();
+const modelStore = useModelStore();
 
-const currentView = ref<"home" | "workspace">("home");
+const currentView = ref<"home" | "workspace" | "models">("home");
 
 function typeColor(): string {
   const m: Record<string, string> = {
@@ -77,7 +82,7 @@ const progressPct = computed(() =>
   currentTaskTotal.value === 0 ? 0 : Math.round(currentTaskAnnotated.value / currentTaskTotal.value * 100)
 );
 
-function onNavigate(view: "home" | "workspace") {
+function onNavigate(view: "home" | "workspace" | "models") {
   currentView.value = view;
   if (view === "workspace" && !projectStore.currentTaskId) {
     // 进入工作台但无打开任务
@@ -147,6 +152,7 @@ let systemThemeMq: MediaQueryList | null = null;
 onMounted(async () => {
   await projectStore.loadProject();
   await settingsStore.load();
+  await modelStore.load();
   applyTheme();
   applyDense(settingsStore.settings.dense_mode);
   // 监听系统主题变化

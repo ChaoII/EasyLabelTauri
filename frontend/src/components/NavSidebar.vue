@@ -8,6 +8,9 @@
       <div class="nav-item" :class="{ active: currentView === 'workspace' }" @click="$emit('navigate', 'workspace')" title="标注工作台">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
       </div>
+      <div class="nav-item" :class="{ active: currentView === 'models' }" @click="$emit('navigate', 'models')" title="模型管理">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
     </div>
 
     <!-- 底部 -->
@@ -23,8 +26,8 @@
 import { useSettingsStore } from "@/stores/settings";
 import { Settings } from "lucide-vue-next";
 
-defineProps<{ currentView: "home" | "workspace" }>();
-defineEmits<{ (e: "navigate", view: "home" | "workspace"): void }>();
+defineProps<{ currentView: "home" | "workspace" | "models" }>();
+defineEmits<{ (e: "navigate", view: "home" | "workspace" | "models"): void }>();
 
 const settingsStore = useSettingsStore();
 
