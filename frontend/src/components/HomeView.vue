@@ -77,6 +77,10 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 <span>导出</span>
               </button>
+              <button class="footer-btn" title="导入标注" @click="openImport(task)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="12 3 12 15"/><polyline points="7 10 12 15 17 10"/></svg>
+                <span>导入</span>
+              </button>
               <button class="footer-btn btn-danger" title="删除" @click="confirmDelete(task)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                 <span>删除</span>
@@ -189,6 +193,26 @@
         <div class="drawer-footer">
           <NButton size="small" @click="showExportModal = false" :disabled="exporting">取消</NButton>
           <NButton size="small" type="primary" @click="handleExport" :loading="exporting">导出</NButton>
+        </div>
+      </template>
+    </NModal>
+
+    <!-- 导入弹窗 -->
+    <NModal v-model:show="showImportModal" preset="card" title="导入标注" :mask-closable="true" style="width: 420px">
+      <div class="modal-body-export">
+        <div class="field">
+          <label class="field-label">任务</label>
+          <div class="export-task-name">{{ importTarget?.name }}</div>
+        </div>
+        <div class="field">
+          <label class="field-label">导入格式</label>
+          <NSelect v-model:value="importFormat" :options="importFormatOptions" size="small" />
+        </div>
+      </div>
+      <template #footer>
+        <div class="drawer-footer">
+          <NButton size="small" @click="showImportModal = false" :disabled="importing">取消</NButton>
+          <NButton size="small" type="primary" @click="handleImport" :loading="importing">开始导入</NButton>
         </div>
       </template>
     </NModal>
@@ -336,6 +360,50 @@ async function handleExport() {
   } finally {
     unlisten();
     exporting.value = false;
+  }
+}
+
+// ==================== 导入 ====================
+const IMPORT_FORMATS: Record<string, { value: string; label: string }[]> = {
+  detection: [{ value: "yolo", label: "YOLO (.txt)" }],
+  rotated_detection: [{ value: "yolo", label: "YOLO OBB (.txt)" }],
+  segmentation: [{ value: "yolo", label: "YOLO (.txt)" }],
+  keypoint: [{ value: "coco_json", label: "COCO JSON" }],
+  ocr: [{ value: "paddleocr", label: "PaddleOCR" }],
+  classification: [],
+};
+const SIMPLE_IMPORT_FORMATS = [{ value: "yolo", label: "YOLO (.txt)" }];
+
+const showImportModal = ref(false);
+const importTarget = ref<Task | null>(null);
+const importFormat = ref("yolo");
+const importFormatOptions = computed(() => SIMPLE_IMPORT_FORMATS);
+const importing = ref(false);
+
+function openImport(task: Task) {
+  importTarget.value = task;
+  importFormat.value = "yolo";
+  showImportModal.value = true;
+}
+
+async function handleImport() {
+  if (!importTarget.value || !importFormat.value) return;
+  importing.value = true;
+  try {
+    const result = await invoke<string>("import_annotations", {
+      request: {
+        image_folder: importTarget.value.image_folder,
+        task_type: importTarget.value.task_type,
+        import_format: importFormat.value,
+        classes: (importTarget.value.classes ?? []).map(c => ({ id: c.id, name: c.name })),
+      },
+    });
+    message.success(result);
+    showImportModal.value = false;
+  } catch (e) {
+    message.error(`导入失败: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    importing.value = false;
   }
 }
 

@@ -580,6 +580,100 @@ pub async fn auto_annotate(request: crate::auto_annotate::AutoAnnotateRequest, a
     Ok(result)
 }
 
+// ==================== 标注导入 ====================
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct ImportRequest {
+    pub image_folder: String,
+    pub task_type: String,
+    pub import_format: String,
+    pub classes: Vec<ExportClassDef>,
+}
+
+fn save_annotations_to_file(image_path: &str, annotations: &[Annotation]) -> Result<(), String> {
+    let ann_path = annotations_path_for_image(image_path);
+    let json = serde_json::to_string_pretty(annotations)
+        .map_err(|e| format!("序列化失败: {}", e))?;
+    fs::write(&ann_path, json).map_err(|e| format!("保存失败: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn import_annotations(request: ImportRequest) -> Result<String, String> {
+    let images = get_image_files(&request.image_folder)?;
+    let mut total = 0usize;
+
+    match request.import_format.as_str() {
+        "yolo" => {
+            for img_path in &images {
+                let p = Path::new(img_path);
+                let stem = p.file_stem().unwrap_or_default().to_string_lossy();
+                let parent = p.parent().unwrap_or(p);
+                let txt_path = parent.join(format!("{}.txt", stem));
+
+                let txt_path = if txt_path.exists() {
+                    txt_path
+                } else {
+                    let txt_path2 = parent.join(format!("{}.{}.txt", stem, "jpg"));
+                    if !txt_path2.exists() {
+                        continue;
+                    }
+                    txt_path2
+                };
+
+                let content = std::fs::read_to_string(&txt_path)
+                    .map_err(|e| format!("读取 {} 失败: {}", txt_path.display(), e))?;
+
+                let mut annotations = Vec::new();
+                for line in content.lines() {
+                    let line = line.trim();
+                    if line.is_empty() || line.starts_with('#') {
+                        continue;
+                    }
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if parts.len() < 5 {
+                        continue;
+                    }
+
+                    let class_id: usize = parts[0].parse().unwrap_or(0);
+                    if class_id >= request.classes.len() {
+                        continue;
+                    }
+
+                    let x_center: f64 = parts[1].parse().unwrap_or(0.0);
+                    let y_center: f64 = parts[2].parse().unwrap_or(0.0);
+                    let w: f64 = parts[3].parse().unwrap_or(0.0);
+                    let h: f64 = parts[4].parse().unwrap_or(0.0);
+
+                    let x1 = (x_center - w / 2.0).max(0.0);
+                    let y1 = (y_center - h / 2.0).max(0.0);
+                    let x2 = (x_center + w / 2.0).min(1.0);
+                    let y2 = (y_center + h / 2.0).min(1.0);
+
+                    annotations.push(Annotation::AxisAlignedBox(AxisAlignedBox {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        class_id,
+                        x1,
+                        y1,
+                        x2,
+                        y2,
+                        confidence: 1.0,
+                        locked: false,
+                    }));
+                }
+
+                if !annotations.is_empty() {
+                    save_annotations_to_file(img_path, &annotations)?;
+                    total += 1;
+                }
+            }
+        }
+        _ => return Err(format!("不支持的导入格式: {}", request.import_format)),
+    }
+
+    Ok(format!("导入完成，共处理 {} 张图片", total))
+}
+
 // ==================== 标注导出 ====================
 
 #[derive(serde::Serialize, serde::Deserialize)]
