@@ -300,6 +300,7 @@ pub fn create_box(
         x2: x1.max(x2),
         y2: y1.max(y2),
         confidence: 1.0,
+        locked: false,
     })
 }
 
@@ -324,6 +325,7 @@ pub fn create_rotated_box(
         height,
         angle,
         confidence: 1.0,
+        locked: false,
     })
 }
 
@@ -343,6 +345,7 @@ pub fn create_rotated_box2(
         height,
         angle,
         confidence: 1.0,
+        locked: false,
     })
 }
 
@@ -355,6 +358,7 @@ pub fn create_polygon(class_id: usize, points: Vec<Point>) -> Option<Annotation>
             points,
             holes: Vec::new(),
             confidence: 1.0,
+            locked: false,
         }))
     } else {
         None
@@ -366,6 +370,7 @@ pub fn create_classification(class_ids: Vec<usize>) -> Annotation {
     Annotation::Classification(ClassificationAnnotation {
         id: Uuid::new_v4().to_string(),
         class_ids,
+        locked: false,
     })
 }
 
@@ -381,6 +386,7 @@ pub fn create_keypoint(
         keypoints,
         bounding_box,
         confidence: 1.0,
+        locked: false,
     })
 }
 
@@ -395,6 +401,7 @@ pub fn create_keypoint_direct(
         keypoints,
         bounding_box: None,
         confidence: 1.0,
+        locked: false,
     })
 }
 
@@ -424,8 +431,10 @@ pub fn create_keypoint_with_bbox(
             height,
             angle: 0.0,
             confidence: 1.0,
+            locked: false,
         }),
         confidence: 1.0,
+        locked: false,
     })
 }
 
@@ -441,6 +450,7 @@ pub fn create_ocr(
         points,
         text,
         confidence: 1.0,
+        locked: false,
     })
 }
 

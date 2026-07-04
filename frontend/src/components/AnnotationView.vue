@@ -52,6 +52,33 @@
             </template>
             AI 自动标注
           </NTooltip>
+          <div class="tool-sep" />
+          <NTooltip trigger="hover" :delay="400" placement="right">
+            <template #trigger>
+              <NButton quaternary block :disabled="!store.canUndo" class="tool-row" @click="store.undo()">
+                <span class="tool-inner">
+                  <span class="tool-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h13a4 4 0 0 1 0 8H7"/><polyline points="7 6 3 10 7 14"/></svg>
+                  </span>
+                  <span class="tool-label">撤销</span>
+                </span>
+              </NButton>
+            </template>
+            撤销 Ctrl+Z
+          </NTooltip>
+          <NTooltip trigger="hover" :delay="400" placement="right">
+            <template #trigger>
+              <NButton quaternary block :disabled="!store.canRedo" class="tool-row" @click="store.redo()">
+                <span class="tool-inner">
+                  <span class="tool-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10H8a4 4 0 0 0 0 8h7"/><polyline points="17 6 21 10 17 14"/></svg>
+                  </span>
+                  <span class="tool-label">重做</span>
+                </span>
+              </NButton>
+            </template>
+            重做 Ctrl+Shift+Z
+          </NTooltip>
         </div>
       </aside>
 
@@ -135,7 +162,15 @@
                 @select="(id) => store.selectAnnotation(id)"
                 @edit="openAnnEdit"
                 @delete="(id) => store.removeAnnotation(id)"
+                @toggle-lock="(id) => store.toggleLock(id)"
+                @toggle-batch="(id) => store.toggleBatchSelect(id)"
               />
+              <div v-if="store.selectedAnnotationIds.size > 0" class="batch-bar">
+                <span class="batch-count">{{ store.selectedAnnotationIds.size }} 个选中</span>
+                <NButton size="tiny" quaternary @click="store.batchDeleteSelected()">删除</NButton>
+                <NButton size="tiny" quaternary @click="showBatchClassModal = true">改类</NButton>
+                <NButton size="tiny" quaternary @click="store.clearBatchSelect()">取消</NButton>
+              </div>
             </div>
           </div>
 
@@ -209,6 +244,22 @@
         <div class="modal-footer">
           <NButton size="small" @click="annEditVisible = false">取消</NButton>
           <NButton size="small" type="primary" @click="confirmAnnEdit">确认</NButton>
+        </div>
+      </template>
+    </NModal>
+
+    <!-- 批量改类弹窗 -->
+    <NModal v-model:show="showBatchClassModal" preset="card" title="批量修改类别" :mask-closable="true" style="width: 320px">
+      <div class="modal-body-edit">
+        <div class="field">
+          <label class="field-label">目标类别</label>
+          <NSelect v-model:value="batchClassId" :options="classOptions" size="small" placeholder="选择类别" />
+        </div>
+      </div>
+      <template #footer>
+        <div class="modal-footer">
+          <NButton size="small" @click="showBatchClassModal = false">取消</NButton>
+          <NButton size="small" type="primary" @click="confirmBatchClass">确认</NButton>
         </div>
       </template>
     </NModal>
@@ -381,6 +432,33 @@ function onKeyDown(e: KeyboardEvent) {
     return;
   }
 
+  // Ctrl+Z 撤销
+  if (e.ctrlKey && key === "z" && !e.shiftKey) {
+    e.preventDefault();
+    store.undo();
+    return;
+  }
+  // Ctrl+Shift+Z / Ctrl+Y 重做
+  if ((e.ctrlKey && key === "z" && e.shiftKey) || (e.ctrlKey && key === "y")) {
+    e.preventDefault();
+    store.redo();
+    return;
+  }
+  // Ctrl+C 复制
+  if (e.ctrlKey && key === "c") {
+    if (store.selectedAnnotationId) {
+      store.copySelectedAnnotation();
+    }
+    return;
+  }
+  // Ctrl+V 粘贴
+  if (e.ctrlKey && key === "v") {
+    if (store.copiedAnnotation) {
+      store.pasteAnnotation();
+    }
+    return;
+  }
+
   // Ctrl+0 自适应缩放
   if (e.ctrlKey && key === "0") {
     e.preventDefault();
@@ -433,7 +511,7 @@ const shortcutHint = computed(() => {
   return tools.map(t => {
     const k = Object.entries(toolKeyMap).find(([_, v]) => v === t.name)?.[0];
     return k ? `${t.label}[${k.toUpperCase()}]` : t.label;
-  }).join("  ") + "  ←[←/A]  →[→/D]  删除[Del]  保存[Ctrl+S]  自适应[Ctrl+0]";
+  }).join("  ") + "  ←[←/A]  →[→/D]  删除[Del]  撤销[Ctrl+Z]  复制[Ctrl+C]  粘贴[Ctrl+V]  保存[Ctrl+S]  自适应[Ctrl+0]";
 });
 
 // ==================== 工具提示 ====================
@@ -464,6 +542,8 @@ const ocrClsModelPath = ref("");
 const ocrDictPath = ref("");
 const showConfirmModal = ref(false);
 const confirmMessage = ref("");
+const showBatchClassModal = ref(false);
+const batchClassId = ref<number | null>(null);
 let confirmResolve: ((v: boolean) => void) | null = null;
 
 function openAiAnnotate() {
@@ -781,6 +861,14 @@ function confirmAnnEdit() {
     store.updateAnnotation(id, { text: annEditText.value } as any);
   }
   annEditVisible.value = false;
+}
+
+function confirmBatchClass() {
+  if (batchClassId.value !== null) {
+    store.batchUpdateClassSelected(batchClassId.value);
+  }
+  showBatchClassModal.value = false;
+  batchClassId.value = null;
 }
 
 // ==================== 统计 ====================
@@ -1266,6 +1354,25 @@ const progressPct = computed(() =>
 .progress-text {
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+/* ---- 批量操作栏 ---- */
+.batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.batch-count {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-right: auto;
 }
 
 /* ---- AI 标注按钮（与 ToolButton 样式统一） ---- */

@@ -72,6 +72,7 @@ pub fn auto_detect(
                 x2,
                 y2,
                 confidence: det.score as f64,
+                locked: false,
             }));
         }
 
@@ -119,6 +120,7 @@ pub fn auto_obb(
                 height: obb.height as f64 / img_h,
                 angle: obb.angle as f64,
                 confidence: obb.score as f64,
+                locked: false,
             }));
         }
 
@@ -177,6 +179,7 @@ pub fn auto_segmentation(
                 points,
                 holes: vec![],
                 confidence: seg.score as f64,
+                locked: false,
             }));
         }
 
@@ -265,9 +268,11 @@ pub fn auto_keypoint(
                     height: pose.rect.height as f64 / img_h,
                     angle: 0.0,
                     confidence: pose.score as f64,
+                    locked: false,
                 }),
                 keypoints,
                 confidence: pose.score as f64,
+                locked: false,
             }));
         }
 
@@ -310,6 +315,7 @@ pub fn auto_classification(
             annotations.push(Annotation::Classification(ClassificationAnnotation {
                 id: uuid::Uuid::new_v4().to_string(),
                 class_ids: vec![class_id],
+                locked: false,
             }));
         }
 
@@ -371,6 +377,7 @@ pub fn auto_ocr(
                 points,
                 text: ocr.text.clone(),
                 confidence: ocr.score as f64,
+                locked: false,
             }));
         }
 

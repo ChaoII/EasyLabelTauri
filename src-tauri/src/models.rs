@@ -25,6 +25,7 @@ pub struct AxisAlignedBox {
     pub x2: f64,  // 右下角 x (归一化 0-1)
     pub y2: f64,  // 右下角 y (归一化 0-1)
     pub confidence: f64,
+    pub locked: bool,
 }
 
 /// 旋转矩形 (YOLO 旋转框格式)
@@ -38,6 +39,7 @@ pub struct RotatedBox {
     pub height: f64, // 高度 (归一化 0-1)
     pub angle: f64,  // 角度 (弧度)
     pub confidence: f64,
+    pub locked: bool,
 }
 
 /// 多边形分割
@@ -48,6 +50,7 @@ pub struct PolygonAnnotation {
     pub points: Vec<Point>,
     pub holes: Vec<Vec<Point>>,
     pub confidence: f64,
+    pub locked: bool,
 }
 
 /// 关键点
@@ -67,6 +70,7 @@ pub struct KeypointAnnotation {
     pub keypoints: Vec<Keypoint>,
     pub bounding_box: Option<RotatedBox>,
     pub confidence: f64,
+    pub locked: bool,
 }
 
 /// OCR 标注
@@ -77,6 +81,7 @@ pub struct OcrAnnotation {
     pub points: Vec<Point>,
     pub text: String,
     pub confidence: f64,
+    pub locked: bool,
 }
 
 /// 分类标注
@@ -84,6 +89,7 @@ pub struct OcrAnnotation {
 pub struct ClassificationAnnotation {
     pub id: String,
     pub class_ids: Vec<usize>,
+    pub locked: bool,
 }
 
 /// 统一标注类型

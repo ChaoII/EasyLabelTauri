@@ -1,53 +1,64 @@
 <template>
-  <NEmpty v-if="annotations.length === 0" description="暂无标注" size="small" />
-  <div v-else class="annotation-list">
-    <div
-      v-for="ann in annotations"
-      :key="ann.id"
-      class="ann-item"
-      :class="{ active: ann.id === selectedId }"
-      @click="emit('select', ann.id)"
-      @dblclick="emit('edit', ann.id)"
-      :data-ann-id="ann.id"
-    >
-      <div class="ann-icon" aria-hidden="true">
-        <Square v-if="ann.type === 'AxisAlignedBox'" :size="14" class="ann-icon-svg" />
-        <Diamond v-else-if="ann.type === 'RotatedBox'" :size="14" class="ann-icon-svg" />
-        <span v-else>{{ typeIcon(ann.type) }}</span>
-      </div>
-      <div class="ann-info">
-        <div class="ann-type">{{ typeName(ann.type) }}</div>
-        <div class="ann-class" :style="{ color: getClassColor(annClassId(ann)) }">
-          <template v-if="ann.type === 'Classification' && 'class_ids' in ann && Array.isArray(ann.class_ids)">
-            <span v-for="(cid, ci) in ann.class_ids" :key="ci" class="cls-tag" :style="{ color: getClassColor(cid), background: getClassColor(cid) + '22' }">
-              {{ getClassName(cid) }}
-            </span>
-          </template>
-          <template v-else>
-            {{ getClassName(annClassId(ann)) }}
-          </template>
-        </div>
-        <div v-if="ann.type === 'Keypoint'" class="ann-kp-info">
-          {{ keypointCountInfo(ann) }}
-        </div>
-      </div>
-      <NButton
-        quaternary
-        circle
-        size="tiny"
-        class="del-btn"
-        @click.stop="emit('delete', ann.id)"
-      >
-        <template #icon>
-          <X />
-        </template>
-      </NButton>
+  <NEmpty v-if="filteredAnnotations.length === 0" description="暂无标注" size="small" />
+  <template v-else>
+    <div class="search-bar">
+      <input v-model="searchText" class="search-input" placeholder="搜索标注..." />
     </div>
-  </div>
+    <div class="annotation-list">
+      <div
+        v-for="ann in filteredAnnotations"
+        :key="ann.id"
+        class="ann-item"
+        :class="{ active: ann.id === selectedId }"
+        @click="handleClick($event, ann.id)"
+        @dblclick="emit('edit', ann.id)"
+        :data-ann-id="ann.id"
+      >
+        <div class="ann-icon" aria-hidden="true">
+          <Square v-if="ann.type === 'AxisAlignedBox'" :size="14" class="ann-icon-svg" />
+          <Diamond v-else-if="ann.type === 'RotatedBox'" :size="14" class="ann-icon-svg" />
+          <span v-else>{{ typeIcon(ann.type) }}</span>
+        </div>
+        <div class="ann-info">
+          <div class="ann-type">{{ typeName(ann.type) }}</div>
+          <div class="ann-class" :style="{ color: getClassColor(annClassId(ann)) }">
+            <template v-if="ann.type === 'Classification' && 'class_ids' in ann && Array.isArray(ann.class_ids)">
+              <span v-for="(cid, ci) in ann.class_ids" :key="ci" class="cls-tag" :style="{ color: getClassColor(cid), background: getClassColor(cid) + '22' }">
+                {{ getClassName(cid) }}
+              </span>
+            </template>
+            <template v-else>
+              {{ getClassName(annClassId(ann)) }}
+            </template>
+          </div>
+          <div v-if="ann.type === 'Keypoint'" class="ann-kp-info">
+            {{ keypointCountInfo(ann) }}
+          </div>
+        </div>
+        <NButton quaternary circle size="tiny" class="lock-btn" @click.stop="emit('toggleLock', ann.id)" title="锁定/解锁">
+          <template #icon>
+            <svg v-if="(ann as any).locked" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </template>
+        </NButton>
+        <NButton
+          quaternary
+          circle
+          size="tiny"
+          class="del-btn"
+          @click.stop="emit('delete', ann.id)"
+        >
+          <template #icon>
+            <X />
+          </template>
+        </NButton>
+      </div>
+    </div>
+  </template>
 </template>
 
 <script setup lang="ts">
-import { watch, nextTick } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { NButton, NEmpty } from "naive-ui";
 import { Diamond, Square, X } from "lucide-vue-next";
 import type { Annotation, ClassDefinition, KeypointAnnotation } from "@/utils/types";
@@ -61,8 +72,31 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "select", id: string): void;
   (e: "edit", id: string): void;
+  (e: "toggleLock", id: string): void;
+  (e: "toggleBatch", id: string): void;
   (e: "delete", id: string): void;
 }>();
+
+const searchText = ref("");
+
+const filteredAnnotations = computed(() => {
+  if (!searchText.value) return props.annotations;
+  const q = searchText.value.toLowerCase();
+  return props.annotations.filter(ann => {
+    const cls = props.classes.find(c => c.id === annClassId(ann));
+    if (cls?.name.toLowerCase().includes(q)) return true;
+    if ("text" in ann && (ann as any).text?.toLowerCase().includes(q)) return true;
+    return false;
+  });
+});
+
+function handleClick(e: MouseEvent, id: string) {
+  if (e.ctrlKey || e.metaKey) {
+    emit("toggleBatch", id);
+  } else {
+    emit("select", id);
+  }
+}
 
 watch(() => props.selectedId, (id) => {
   if (!id) return;
@@ -205,5 +239,29 @@ function keypointCountInfo(ann: Annotation): string {
 
 .del-btn:hover {
   color: var(--danger) !important;
+}
+
+.search-bar {
+  padding: 4px 0;
+}
+.search-input {
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 11px;
+  outline: none;
+}
+.search-input:focus {
+  border-color: var(--accent);
+}
+.lock-btn {
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.lock-btn:hover {
+  opacity: 1;
 }
 </style>

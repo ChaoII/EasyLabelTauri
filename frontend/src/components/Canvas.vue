@@ -1750,6 +1750,8 @@ function onDblClick(_e: MouseEvent) {
 // ==================== 标注交互 ====================
 
 function onAnnotationMousedown(e: MouseEvent, ann: Annotation) {
+  // 锁定标注不可操作
+  if ((ann as any).locked) return;
   if (store.activeTool !== "select") return;
   e.stopPropagation();
 

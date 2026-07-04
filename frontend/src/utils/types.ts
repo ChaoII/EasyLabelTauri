@@ -23,6 +23,7 @@ export interface AxisAlignedBox {
   x2: number; // 右下角 x (归一化 0-1)
   y2: number; // 右下角 y (归一化 0-1)
   confidence: number;
+  locked?: boolean;
 }
 
 export interface RotatedBox {
@@ -35,6 +36,7 @@ export interface RotatedBox {
   height: number;
   angle: number;
   confidence: number;
+  locked?: boolean;
 }
 
 export interface PolygonAnnotation {
@@ -44,6 +46,7 @@ export interface PolygonAnnotation {
   points: Point[];
   holes: Point[][];
   confidence: number;
+  locked?: boolean;
 }
 
 export interface KeypointAnnotation {
@@ -53,6 +56,7 @@ export interface KeypointAnnotation {
   keypoints: Keypoint[];
   bounding_box: RotatedBox | null;
   confidence: number;
+  locked?: boolean;
 }
 
 export interface OcrAnnotation {
@@ -62,12 +66,14 @@ export interface OcrAnnotation {
   points: Point[];
   text: string;
   confidence: number;
+  locked?: boolean;
 }
 
 export interface ClassificationAnnotation {
   id: string;
   type: "Classification";
   class_ids: number[];
+  locked?: boolean;
 }
 
 export type Annotation =

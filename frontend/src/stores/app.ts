@@ -31,6 +31,11 @@ export const useAppStore = defineStore("app", () => {
   const classes = ref<ClassDefinition[]>([]);
   const activeTool = ref<ToolName>("select");
   const selectedAnnotationId = ref<string | null>(null);
+  const history = ref<Annotation[][]>([]);
+  const historyIndex = ref(-1);
+  const historyCapacity = 50;
+  const copiedAnnotation = ref<Annotation | null>(null);
+  const selectedAnnotationIds = ref<Set<string>>(new Set());
   const zoom = ref(1);
   const panX = ref(0);
   const panY = ref(0);
@@ -273,8 +278,38 @@ export const useAppStore = defineStore("app", () => {
     }
   }
 
+  // ==================== 历史操作 ====================
+  function pushHistory() {
+    if (historyIndex.value < history.value.length - 1) {
+      history.value = history.value.slice(0, historyIndex.value + 1);
+    }
+    history.value.push(JSON.parse(JSON.stringify(annotations.value)));
+    if (history.value.length > historyCapacity) {
+      history.value.shift();
+    }
+    historyIndex.value = history.value.length - 1;
+  }
+
+  const canUndo = computed(() => historyIndex.value > 0);
+  const canRedo = computed(() => historyIndex.value < history.value.length - 1);
+
+  function undo() {
+    if (!canUndo.value) return;
+    historyIndex.value--;
+    annotations.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
+    saveCurrentAnnotations();
+  }
+
+  function redo() {
+    if (!canRedo.value) return;
+    historyIndex.value++;
+    annotations.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
+    saveCurrentAnnotations();
+  }
+
   // ==================== 标注操作 ====================
   function addAnnotation(annotation: Annotation) {
+    pushHistory();
     annotations.value.push(annotation);
     if (imagePath.value) {
       imageAnnotationMap.value[imagePath.value] = true;
@@ -283,6 +318,7 @@ export const useAppStore = defineStore("app", () => {
   }
 
   function removeAnnotation(id: string) {
+    pushHistory();
     annotations.value = annotations.value.filter((a) => a.id !== id);
     if (selectedAnnotationId.value === id) {
       selectedAnnotationId.value = null;
@@ -368,11 +404,76 @@ export const useAppStore = defineStore("app", () => {
   }
 
   function updateAnnotation(id: string, updated: Partial<Annotation>) {
+    pushHistory();
     const idx = annotations.value.findIndex((a) => a.id === id);
     if (idx !== -1) {
       annotations.value[idx] = { ...annotations.value[idx], ...updated } as any;
       saveCurrentAnnotations();
     }
+  }
+
+  // ==================== 复制/粘贴/锁定 ====================
+  function copySelectedAnnotation() {
+    if (!selectedAnnotationId.value) return;
+    const ann = annotations.value.find(a => a.id === selectedAnnotationId.value);
+    if (ann) copiedAnnotation.value = JSON.parse(JSON.stringify(ann));
+  }
+
+  function pasteAnnotation() {
+    if (!copiedAnnotation.value || !imagePath.value) return;
+    pushHistory();
+    const newAnn = JSON.parse(JSON.stringify(copiedAnnotation.value)) as Annotation;
+    newAnn.id = crypto.randomUUID();
+    if ("x1" in newAnn) { (newAnn as any).x1 += 0.01; (newAnn as any).x2 += 0.01; }
+    if ("y1" in newAnn) { (newAnn as any).y1 += 0.01; (newAnn as any).y2 += 0.01; }
+    if ("cx" in newAnn) { (newAnn as any).cx += 0.01; (newAnn as any).cy += 0.01; }
+    addAnnotation(newAnn);
+  }
+
+  function toggleLock(id: string) {
+    pushHistory();
+    const ann = annotations.value.find(a => a.id === id);
+    if (ann) (ann as any).locked = !(ann as any).locked;
+    saveCurrentAnnotations();
+  }
+
+  // ==================== 批量操作 ====================
+  function toggleBatchSelect(id: string) {
+    const s = selectedAnnotationIds.value;
+    if (s.has(id)) s.delete(id);
+    else s.add(id);
+    selectedAnnotationIds.value = new Set(s);
+  }
+
+  function clearBatchSelect() {
+    selectedAnnotationIds.value = new Set();
+  }
+
+  function batchDeleteSelected() {
+    const ids = Array.from(selectedAnnotationIds.value);
+    if (ids.length === 0) return;
+    pushHistory();
+    ids.forEach(id => {
+      annotations.value = annotations.value.filter(a => a.id !== id);
+    });
+    if (selectedAnnotationId.value && ids.includes(selectedAnnotationId.value)) {
+      selectedAnnotationId.value = null;
+    }
+    clearBatchSelect();
+    saveCurrentAnnotations();
+  }
+
+  function batchUpdateClassSelected(classId: number) {
+    const ids = Array.from(selectedAnnotationIds.value);
+    if (ids.length === 0) return;
+    pushHistory();
+    ids.forEach(id => {
+      const ann = annotations.value.find(a => a.id === id);
+      if (ann && "class_id" in ann) (ann as any).class_id = classId;
+      if (ann && "class_ids" in ann) (ann as any).class_ids = [classId];
+    });
+    clearBatchSelect();
+    saveCurrentAnnotations();
   }
 
   function clearAnnotations() {
@@ -718,6 +819,12 @@ export const useAppStore = defineStore("app", () => {
     classes,
     activeTool,
     selectedAnnotationId,
+    history,
+    historyIndex,
+    canUndo,
+    canRedo,
+    copiedAnnotation,
+    selectedAnnotationIds,
     zoom,
     panX,
     panY,
@@ -748,6 +855,15 @@ export const useAppStore = defineStore("app", () => {
     selectedAnnotation,
     annotationCount,
     // actions
+    undo,
+    redo,
+    copySelectedAnnotation,
+    pasteAnnotation,
+    toggleLock,
+    toggleBatchSelect,
+    clearBatchSelect,
+    batchDeleteSelected,
+    batchUpdateClassSelected,
     loadImage,
     loadFolder,
     goToImage,
